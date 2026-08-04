@@ -241,6 +241,19 @@ export function buildAuthHeaders(): { [key: string]: string } {
     if (env.DEBUG) console.error("Using XSRF token from .env file for X-XSRF-TOKEN header");
   }
 
+  // note.comの書き込みAPIはdouble-submit CSRF検証を行うため、
+  // X-XSRF-TOKENヘッダーと同じ値をXSRF-TOKEN Cookieにも含める。
+  const xsrfToken = headers["X-XSRF-TOKEN"];
+  if (headers["Cookie"] && xsrfToken && !/(^|;\s*)XSRF-TOKEN=/.test(headers["Cookie"])) {
+    let decodedToken = xsrfToken;
+    try {
+      decodedToken = decodeURIComponent(xsrfToken);
+    } catch {
+      // 既にデコード済み、または不正なpercent encodingの場合は元の値を使用する。
+    }
+    headers["Cookie"] += `; XSRF-TOKEN=${encodeURIComponent(decodedToken)}`;
+  }
+
   // User-Agentは常に設定
   headers["User-Agent"] =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36";

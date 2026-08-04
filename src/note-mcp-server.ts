@@ -502,6 +502,19 @@ async function noteApiRequest(
     headers["X-XSRF-TOKEN"] = NOTE_XSRF_TOKEN;
   }
 
+  // note.comの書き込みAPIはdouble-submit CSRF検証を行うため、
+  // X-XSRF-TOKENヘッダーと同じ値をXSRF-TOKEN Cookieにも含める。
+  const xsrfToken = headers["X-XSRF-TOKEN"];
+  if (headers["Cookie"] && xsrfToken && !/(^|;\s*)XSRF-TOKEN=/.test(headers["Cookie"])) {
+    let decodedToken = xsrfToken;
+    try {
+      decodedToken = decodeURIComponent(xsrfToken);
+    } catch {
+      // 既にデコード済み、または不正なpercent encodingの場合は元の値を使用する。
+    }
+    headers["Cookie"] += `; XSRF-TOKEN=${encodeURIComponent(decodedToken)}`;
+  }
+
   const options: any = {
     method,
     headers,
@@ -575,6 +588,34 @@ async function noteApiRequest(
     throw error;
   }
 }
+
+let cachedNoteApiUserId: string | null = null;
+
+async function resolveNoteApiUserId(): Promise<string> {
+  if (cachedNoteApiUserId) return cachedNoteApiUserId;
+  if (!NOTE_USER_ID) {
+    throw new Error(
+      "新規下書きの作成にはNOTE_USER_IDが必要です。.envを確認してください。",
+    );
+  }
+
+  const creatorResult = await noteApiRequest(
+    `/v2/creators/${encodeURIComponent(NOTE_USER_ID)}`,
+  );
+  const creatorPayload = (creatorResult.data || creatorResult) as any;
+  const numericUserId = creatorPayload.id || creatorPayload.user?.id;
+  if (!numericUserId) {
+    const payloadKeys = Object.keys(creatorPayload || {});
+    throw new Error(
+      `note.comの数値ユーザーIDを解決できませんでした（creator keys: ${payloadKeys.join(",") || "none"}）`,
+    );
+  }
+
+  const resolvedUserId = numericUserId.toString();
+  cachedNoteApiUserId = resolvedUserId;
+  return resolvedUserId;
+}
+
 function hasAuth() {
   // 動的に取得したセッションCookieを優先的にチェック
   return localActiveSessionCookie !== null || AUTH_STATUS.anyAuth;
@@ -1644,21 +1685,28 @@ server.tool(
             } = presignData.data;
 
             // Step 2: S3にアップロード
+            // note.com の presign は x-amz-security-token を含むことがある。
+            // 固定キー順だと token が落ちて S3 403 になるため、post の全キーを送る。
+            // file フィールドは必ず最後。
             const boundary2 = `----WebKitFormBoundary${Math.random().toString(36).substring(2)}`;
             const s3FormParts: Buffer[] = [];
 
-            const paramOrder = [
+            const preferredOrder = [
               "key",
               "acl",
               "Expires",
+              "Content-Type",
+              "success_action_status",
               "policy",
               "x-amz-credential",
               "x-amz-algorithm",
               "x-amz-date",
+              "x-amz-security-token",
               "x-amz-signature",
             ];
-            for (const key of paramOrder) {
-              if (s3Params[key]) {
+            const postedKeys = new Set<string>();
+            for (const key of preferredOrder) {
+              if (s3Params[key] != null && s3Params[key] !== "") {
                 s3FormParts.push(
                   Buffer.from(
                     `--${boundary2}\r\n` +
@@ -1666,7 +1714,19 @@ server.tool(
                       `${s3Params[key]}\r\n`,
                   ),
                 );
+                postedKeys.add(key);
               }
+            }
+            for (const [key, value] of Object.entries(s3Params)) {
+              if (postedKeys.has(key)) continue;
+              if (value == null || value === "") continue;
+              s3FormParts.push(
+                Buffer.from(
+                  `--${boundary2}\r\n` +
+                    `Content-Disposition: form-data; name="${key}"\r\n\r\n` +
+                    `${value}\r\n`,
+                ),
+              );
             }
 
             s3FormParts.push(
@@ -1692,8 +1752,9 @@ server.tool(
             });
 
             if (!s3Response.ok && s3Response.status !== 204) {
+              const errBody = await s3Response.text().catch(() => "");
               console.error(
-                `S3アップロード失敗: ${fileName} (${s3Response.status})`,
+                `S3アップロード失敗: ${fileName} (${s3Response.status}) ${errBody.slice(0, 300)}`,
               );
               continue;
             }
@@ -1792,6 +1853,12 @@ server.tool(
       if (!noteId) {
         console.error("新規下書きを作成します...");
 
+        if (!NOTE_USER_ID) {
+          throw new Error(
+            "新規下書きの作成にはNOTE_USER_IDが必要です。.envを確認してください。",
+          );
+        }
+
         const createData = {
           body: "<p></p>",
           body_length: 0,
@@ -1800,21 +1867,32 @@ server.tool(
           is_lead_form: false,
         };
 
+        const noteApiUserId = await resolveNoteApiUserId();
         const createResult = await noteApiRequest(
-          "/v1/text_notes",
+          `/v1/text_notes?user_id=${encodeURIComponent(noteApiUserId)}`,
           "POST",
           createData,
           true,
         );
 
-        if (createResult.data?.id) {
-          noteId = createResult.data.id.toString();
-          noteKey = createResult.data.key || null;
+        const createPayload = (createResult.data || createResult) as any;
+        const createdNote =
+          createPayload.note || createPayload.text_note || createPayload.textNote || createPayload;
+        const createdId = createdNote.id || createPayload.note_id || createPayload.noteId;
+        const createdKey = createdNote.key || createPayload.note_key || createPayload.noteKey;
+
+        if (createdId) {
+          noteId = createdId.toString();
+          noteKey = createdKey || null;
           console.error(
             `下書き作成成功: ID=${noteId}, key=${noteKey || `n${noteId}`}`,
           );
         } else {
-          throw new Error("下書きの作成に失敗しました");
+          const topLevelKeys = Object.keys((createResult as any) || {});
+          const payloadKeys = Object.keys(createPayload || {});
+          throw new Error(
+            `下書きの作成に失敗しました（response keys: ${topLevelKeys.join(",") || "none"}; payload keys: ${payloadKeys.join(",") || "none"}）`,
+          );
         }
       }
 
@@ -1917,11 +1995,36 @@ server.tool(
             { method: "POST", headers: eyecatchHeaders, body: formBody }
           );
 
-          if (eyecatchRes.status === 201) {
+          const eyecatchText = await eyecatchRes.text().catch(() => "");
+          let eyecatchJson: any = null;
+          try {
+            eyecatchJson = eyecatchText ? JSON.parse(eyecatchText) : null;
+          } catch {
+            eyecatchJson = null;
+          }
+          const uploadedEyecatchUrl =
+            eyecatchJson?.data?.url ||
+            eyecatchJson?.data?.eyecatch ||
+            eyecatchJson?.data?.eyecatch_url ||
+            "";
+          console.error(
+            `[eyecatch] HTTP ${eyecatchRes.status} response body: ${eyecatchText.slice(0, 300)}`,
+          );
+          console.error(
+            `[eyecatch] uploadedEyecatchUrl from response: ${uploadedEyecatchUrl || "(empty)"}`,
+          );
+
+          if (eyecatchRes.status === 201 && uploadedEyecatchUrl) {
+            eyecatchImageUrl = uploadedEyecatchUrl;
             console.error("アイキャッチ画像の設定に成功しました");
+          } else if (eyecatchRes.status === 201 && !uploadedEyecatchUrl) {
+            console.error(
+              "アイキャッチAPIは201だがURLが空。draft_saveのeyecatch紐付けをスキップします",
+            );
           } else {
-            const errText = await eyecatchRes.text().catch(() => "");
-            console.error(`アイキャッチ設定失敗: ${eyecatchRes.status} ${errText}`);
+            console.error(
+              `アイキャッチ設定失敗: ${eyecatchRes.status} ${eyecatchText.slice(0, 300)}`,
+            );
           }
         } catch (eyecatchError) {
           console.error(`アイキャッチ画像の設定に失敗: ${eyecatchError}`);
