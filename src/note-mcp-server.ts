@@ -18,7 +18,7 @@ import {
 } from "./utils/auth.js";
 
 // Markdown converter utility
-import { convertMarkdownToNoteHtml } from "./utils/markdown-converter.js";
+import { convertMarkdownToNoteHtml, looksLikeHtml } from "./utils/markdown-converter.js";
 
 // ESMでの__dirnameの代替
 const __filename = fileURLToPath(import.meta.url);
@@ -1393,8 +1393,16 @@ server.tool(
       }
 
       // MarkdownをHTMLに変換
-      console.error("🔄 MarkdownをHTMLに変換中...");
-      const htmlBody = convertMarkdownToNoteHtml(body || "");
+      // 既にHTML変換済みの本文が送られてきた場合、再変換すると不正な入れ子<p>タグを生むため
+      // （note.comエディタ上でタイトル直後に空行が入る原因）、その場合は変換をスキップする。
+      let htmlBody: string;
+      if (looksLikeHtml(body || "")) {
+        console.error("ℹ️ bodyは既にHTML形式のためMarkdown変換をスキップします");
+        htmlBody = body || "";
+      } else {
+        console.error("🔄 MarkdownをHTMLに変換中...");
+        htmlBody = convertMarkdownToNoteHtml(body || "");
+      }
       console.error("✅ HTML変換完了:", {
         originalLength: body?.length,
         htmlLength: htmlBody.length,
@@ -1907,7 +1915,15 @@ server.tool(
         },
       );
 
-      let htmlBody = convertMarkdownToNoteHtml(bodyForConversion);
+      // 既にHTML変換済みの本文が送られてきた場合、再変換すると不正な入れ子<p>タグを生むため
+      // （note.comエディタ上でタイトル直後に空行が入る原因）、その場合は変換をスキップする。
+      let htmlBody: string;
+      if (looksLikeHtml(bodyForConversion)) {
+        console.error("ℹ️ bodyは既にHTML形式のためMarkdown変換をスキップします");
+        htmlBody = bodyForConversion;
+      } else {
+        htmlBody = convertMarkdownToNoteHtml(bodyForConversion);
+      }
 
       figures.forEach((figure, index) => {
         htmlBody = htmlBody.replace(

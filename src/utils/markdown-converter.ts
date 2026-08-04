@@ -418,3 +418,19 @@ export function convertMarkdownToNoteHtml(markdown: string): string {
   const htmlWithUUID = addUUIDAttributes(html);
   return sanitizeHtmlForNote(htmlWithUUID);
 }
+
+/**
+ * 渡された文字列が（Markdownではなく）既にHTMLかどうかを判定する。
+ *
+ * クライアント（Obsidianプラグイン等）が既にHTML変換済みの本文を送ってきた場合、
+ * これをさらにconvertMarkdownToNoteHtmlへ通すと「1つの巨大な段落」とみなされて
+ * 新しい<p>で丸ごと包まれ、<p>の中に<p>が入る不正な入れ子HTMLになる。
+ * note.comエディタ（ブラウザのHTMLパーサー）はHTML5仕様に従い、内側の<p>開始タグを
+ * 見つけた時点で外側の<p>を自動的に閉じるため、空の<p></p>がタイトル直後に残り、
+ * 「本文の先頭に空行が1行入る」症状として現れる。
+ * この関数で二重変換を検知し、呼び出し側でconvertMarkdownToNoteHtmlをスキップできるようにする。
+ */
+export function looksLikeHtml(text: string): boolean {
+  if (!text) return false;
+  return /^\s*<(p|h[1-6]|blockquote|ol|ul|hr|pre|div|figure)[\s>\/]/i.test(text);
+}
