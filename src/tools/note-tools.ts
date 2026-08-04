@@ -66,6 +66,36 @@ function isStructuralLine(line: string): boolean {
   );
 }
 
+let cachedNoteApiUserId: string | null = null;
+
+async function getCreateDraftEndpoint(): Promise<string> {
+  if (!env.NOTE_USER_ID) {
+    throw new Error(
+      "新規下書きの作成にはNOTE_USER_IDが必要です。.envを確認してください。"
+    );
+  }
+
+  if (cachedNoteApiUserId) {
+    return `/v1/text_notes?user_id=${encodeURIComponent(cachedNoteApiUserId)}`;
+  }
+
+  const creatorResult = await noteApiRequest(
+    `/v2/creators/${encodeURIComponent(env.NOTE_USER_ID)}`
+  );
+  const creatorPayload = (creatorResult.data || creatorResult) as any;
+  const numericUserId = creatorPayload.id || creatorPayload.user?.id;
+  if (!numericUserId) {
+    const payloadKeys = Object.keys(creatorPayload || {});
+    throw new Error(
+      `note.comの数値ユーザーIDを解決できませんでした（creator keys: ${payloadKeys.join(",") || "none"}）`
+    );
+  }
+
+  const resolvedUserId = numericUserId.toString();
+  cachedNoteApiUserId = resolvedUserId;
+  return `/v1/text_notes?user_id=${encodeURIComponent(resolvedUserId)}`;
+}
+
 export function registerNoteTools(server: McpServer) {
   // 1. 記事詳細取得ツール
   server.tool(
@@ -200,19 +230,29 @@ export function registerNoteTools(server: McpServer) {
           const headers = buildCustomHeaders();
 
           const createResult = await noteApiRequest(
-            "/v1/text_notes",
+            await getCreateDraftEndpoint(),
             "POST",
             createData,
             true,
             headers
           );
 
-          if (createResult.data?.id) {
-            id = createResult.data.id.toString();
-            const key = createResult.data.key || `n${id}`;
+          const createPayload = (createResult.data || createResult) as any;
+          const createdNote =
+            createPayload.note || createPayload.text_note || createPayload.textNote || createPayload;
+          const createdId = createdNote.id || createPayload.note_id || createPayload.noteId;
+          const createdKey = createdNote.key || createPayload.note_key || createPayload.noteKey;
+
+          if (createdId) {
+            id = createdId.toString();
+            const key = createdKey || `n${id}`;
             console.error(`下書き作成成功: ID=${id}, key=${key}`);
           } else {
-            throw new Error("下書きの作成に失敗しました");
+            const topLevelKeys = Object.keys(createResult || {});
+            const payloadKeys = Object.keys(createPayload || {});
+            throw new Error(
+              `下書きの作成に失敗しました（response keys: ${topLevelKeys.join(",") || "none"}; payload keys: ${payloadKeys.join(",") || "none"}）`
+            );
           }
         }
 
@@ -385,18 +425,22 @@ export function registerNoteTools(server: McpServer) {
               const boundary2 = `----WebKitFormBoundary${Math.random().toString(36).substring(2)}`;
               const s3FormParts: Buffer[] = [];
 
-              const paramOrder = [
+              const preferredOrder = [
                 "key",
                 "acl",
                 "Expires",
+                "Content-Type",
+                "success_action_status",
                 "policy",
                 "x-amz-credential",
                 "x-amz-algorithm",
                 "x-amz-date",
+                "x-amz-security-token",
                 "x-amz-signature",
               ];
-              for (const key of paramOrder) {
-                if (s3Params[key]) {
+              const postedKeys = new Set<string>();
+              for (const key of preferredOrder) {
+                if (s3Params[key] != null && s3Params[key] !== "") {
                   s3FormParts.push(
                     Buffer.from(
                       `--${boundary2}\r\n` +
@@ -404,7 +448,18 @@ export function registerNoteTools(server: McpServer) {
                         `${s3Params[key]}\r\n`
                     )
                   );
+                  postedKeys.add(key);
                 }
+              }
+              for (const [key, value] of Object.entries(s3Params as Record<string, any>)) {
+                if (postedKeys.has(key) || value == null || value === "") continue;
+                s3FormParts.push(
+                  Buffer.from(
+                    `--${boundary2}\r\n` +
+                      `Content-Disposition: form-data; name="${key}"\r\n\r\n` +
+                      `${value}\r\n`
+                  )
+                );
               }
 
               s3FormParts.push(
@@ -609,19 +664,29 @@ export function registerNoteTools(server: McpServer) {
           const headers = buildCustomHeaders();
 
           const createResult = await noteApiRequest(
-            "/v1/text_notes",
+            await getCreateDraftEndpoint(),
             "POST",
             createData,
             true,
             headers
           );
 
-          if (createResult.data?.id) {
-            id = createResult.data.id.toString();
-            noteKey = createResult.data.key || null;
+          const createPayload = (createResult.data || createResult) as any;
+          const createdNote =
+            createPayload.note || createPayload.text_note || createPayload.textNote || createPayload;
+          const createdId = createdNote.id || createPayload.note_id || createPayload.noteId;
+          const createdKey = createdNote.key || createPayload.note_key || createPayload.noteKey;
+
+          if (createdId) {
+            id = createdId.toString();
+            noteKey = createdKey || null;
             console.error(`下書き作成成功: ID=${id}, key=${noteKey || `n${id}`}`);
           } else {
-            throw new Error("下書きの作成に失敗しました");
+            const topLevelKeys = Object.keys(createResult || {});
+            const payloadKeys = Object.keys(createPayload || {});
+            throw new Error(
+              `下書きの作成に失敗しました（response keys: ${topLevelKeys.join(",") || "none"}; payload keys: ${payloadKeys.join(",") || "none"}）`
+            );
           }
         }
 

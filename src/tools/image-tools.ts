@@ -183,19 +183,23 @@ export function registerImageTools(server: McpServer): void {
         const boundary2 = `----WebKitFormBoundary${Math.random().toString(36).substring(2)}`;
         const s3FormParts: Buffer[] = [];
 
-        // S3パラメータを追加（順序が重要）
-        const paramOrder = [
+        // note.com presign may include x-amz-security-token. Send ALL post keys; file last.
+        const preferredOrder = [
           "key",
           "acl",
           "Expires",
+          "Content-Type",
+          "success_action_status",
           "policy",
           "x-amz-credential",
           "x-amz-algorithm",
           "x-amz-date",
+          "x-amz-security-token",
           "x-amz-signature",
         ];
-        for (const key of paramOrder) {
-          if (s3Params[key]) {
+        const postedKeys = new Set<string>();
+        for (const key of preferredOrder) {
+          if (s3Params[key] != null && s3Params[key] !== "") {
             s3FormParts.push(
               Buffer.from(
                 `--${boundary2}\r\n` +
@@ -203,7 +207,18 @@ export function registerImageTools(server: McpServer): void {
                   `${s3Params[key]}\r\n`
               )
             );
+            postedKeys.add(key);
           }
+        }
+        for (const [key, value] of Object.entries(s3Params as Record<string, any>)) {
+          if (postedKeys.has(key) || value == null || value === "") continue;
+          s3FormParts.push(
+            Buffer.from(
+              `--${boundary2}\r\n` +
+                `Content-Disposition: form-data; name="${key}"\r\n\r\n` +
+                `${value}\r\n`
+            )
+          );
         }
 
         // ファイルパート（最後に追加）
@@ -401,18 +416,22 @@ export function registerImageTools(server: McpServer): void {
           const boundary2 = `----WebKitFormBoundary${Math.random().toString(36).substring(2)}`;
           const s3FormParts: Buffer[] = [];
 
-          const paramOrder = [
+          const preferredOrder = [
             "key",
             "acl",
             "Expires",
+            "Content-Type",
+            "success_action_status",
             "policy",
             "x-amz-credential",
             "x-amz-algorithm",
             "x-amz-date",
+            "x-amz-security-token",
             "x-amz-signature",
           ];
-          for (const key of paramOrder) {
-            if (s3Params[key]) {
+          const postedKeys = new Set<string>();
+          for (const key of preferredOrder) {
+            if (s3Params[key] != null && s3Params[key] !== "") {
               s3FormParts.push(
                 Buffer.from(
                   `--${boundary2}\r\n` +
@@ -420,7 +439,18 @@ export function registerImageTools(server: McpServer): void {
                     `${s3Params[key]}\r\n`
                 )
               );
+              postedKeys.add(key);
             }
+          }
+          for (const [key, value] of Object.entries(s3Params as Record<string, any>)) {
+            if (postedKeys.has(key) || value == null || value === "") continue;
+            s3FormParts.push(
+              Buffer.from(
+                `--${boundary2}\r\n` +
+                  `Content-Disposition: form-data; name="${key}"\r\n\r\n` +
+                  `${value}\r\n`
+              )
+            );
           }
 
           s3FormParts.push(

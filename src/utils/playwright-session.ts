@@ -148,27 +148,39 @@ async function extractAndSaveCookies(
 
   process.env.NOTE_ALL_COOKIES = concatenatedCookies;
 
-  // ユーザーID取得（失敗しても続行）
+  // ユーザーID取得と認証セッションの検証
+  // _note_session_v5 は未ログインの訪問者にも発行されるため、Cookie取得だけでは
+  // 実際にログインできたかを保証できない。current_userを叩いて明確に検証する。
   let userKey: string | null = null;
-  try {
-    userKey = await page.evaluate(async () => {
-      try {
-        const res = await fetch("https://note.com/api/v2/current_user", {
-          credentials: "include",
-        });
-        if (!res.ok) return null;
-        const json = await res.json();
-        return json?.data?.urlname || json?.data?.id || null;
-      } catch {
-        return null;
-      }
-    });
-    if (userKey) {
-      setActiveUserKey(userKey);
-      process.env.NOTE_USER_ID = userKey;
+  const authCheck = await page.evaluate(async () => {
+    try {
+      const res = await fetch("https://note.com/api/v2/current_user", {
+        credentials: "include",
+      });
+      const json = await res.json().catch(() => null);
+      const data = json?.data;
+      return {
+        status: res.status,
+        isMe: typeof data === "object" && data !== null && (data as any).is_me === true,
+        urlname:
+          (typeof data === "object" && data !== null && ((data as any).urlname || (data as any).id)) ||
+          null,
+      };
+    } catch {
+      return null;
     }
-  } catch {
-    // ユーザー情報取得は必須ではない
+  });
+
+  if (authCheck && authCheck.status === 401) {
+    throw new Error(
+      "ログイン処理は完了しましたが、note.comが未ログインと判定しています（current_user: 401）。セッションが正しく確立できていない可能性があるため、再度ログインしてください。"
+    );
+  }
+
+  if (authCheck?.urlname) {
+    userKey = String(authCheck.urlname);
+    setActiveUserKey(userKey);
+    process.env.NOTE_USER_ID = userKey;
   }
 
   // .envファイルに書き戻し
@@ -422,24 +434,31 @@ export async function refreshSessionWithPlaywright(
         await new Promise((resolve) => setTimeout(resolve, 500));
 
         try {
+          // _note_session_v5 は未ログインの訪問者にも発行されるゲスト用セッションCookieのため、
+          // Cookieの存在だけでなく /login から離脱したことも合わせて確認する。
           const cookies = await context.cookies("https://note.com");
           const hasSession = cookies.some(
             (c) => c.name === "_note_session_v5" && c.value !== ""
           );
 
-          if (hasSession) {
+          const currentUrl = page.url();
+          const isLoginPage = new URL(currentUrl).pathname.startsWith("/login");
+
+          if (hasSession && !isLoginPage) {
             loginComplete = true;
             console.error("✅ ログインを検知しました！");
             break;
           }
 
-          const currentUrl = page.url();
-          const isLoginPage = new URL(currentUrl).pathname.startsWith("/login");
-          if (!isLoginPage && currentUrl.includes("note.com")) {
-            // ログインページから離れたら少し待ってから再確認
+          if (hasSession && isLoginPage) {
+            // ログインページに留まったままの場合は少し待ってから再確認
             await new Promise((resolve) => setTimeout(resolve, 2000));
             const retryCheck = await context.cookies("https://note.com");
-            if (retryCheck.some((c) => c.name === "_note_session_v5" && c.value !== "")) {
+            const stillHasSession = retryCheck.some(
+              (c) => c.name === "_note_session_v5" && c.value !== ""
+            );
+            const stillOnLoginPage = new URL(page.url()).pathname.startsWith("/login");
+            if (stillHasSession && !stillOnLoginPage) {
               loginComplete = true;
               console.error("✅ ログインを検知しました！");
             }
