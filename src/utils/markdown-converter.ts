@@ -88,6 +88,12 @@ export function convertMarkdownToHtml(markdown: string): string {
     return `__INLINE_CODE_${index}__`;
   });
 
+  // 複数行にまたがる太字（Obsidianのスマホ最適化改行スタイル対応）。
+  // **開始と**終了が別の行にあると行単位のprocessInlineではマッチしないため、
+  // 段落境界（空行）をまたがない範囲で先に<strong>へ変換しておく。
+  // 見出し・リスト行の判定より前に実行しても、行頭マーカー（#, -, 数字.）は**の外側にあるため影響しない。
+  text = text.replace(/\*\*((?:(?!\n\n)(?!\*\*)[\s\S])+?)\*\*/g, "<strong>$1</strong>");
+
   // 空行で段落を分割
   const paragraphs = text.split(/\n\n+/);
   const result: string[] = [];
