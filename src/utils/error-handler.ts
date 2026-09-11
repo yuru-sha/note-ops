@@ -1,4 +1,5 @@
 import { ToolResponse, ErrorResponse } from "../types/api-types.js";
+import { redactSensitiveValues } from "./safe-logging.js";
 
 export function createSuccessResponse(data: any): ToolResponse {
   return {
@@ -12,7 +13,7 @@ export function createSuccessResponse(data: any): ToolResponse {
 }
 
 export function createErrorResponse(error: string | Error): ErrorResponse {
-  const errorMessage = error instanceof Error ? error.message : error;
+  const errorMessage = redactSensitiveValues(error instanceof Error ? error.message : error);
   return {
     content: [
       {
@@ -40,17 +41,18 @@ export function createValidationErrorResponse(field: string, reason: string): Er
 
 // 共通のエラーハンドラー
 export function handleApiError(error: any, operation: string): ErrorResponse {
-  console.error(`Error in ${operation}:`, error);
+  const errorMessage = redactSensitiveValues(error instanceof Error ? error.message : error);
+  console.error(`Error in ${operation}: ${errorMessage}`);
 
-  if (error.message?.includes("認証")) {
+  if (errorMessage.includes("認証")) {
     return createAuthErrorResponse();
   }
 
-  if (error.message?.includes("404")) {
+  if (errorMessage.includes("404")) {
     return createNotFoundResponse(operation);
   }
 
-  return createErrorResponse(`${operation}に失敗しました: ${error.message || error}`);
+  return createErrorResponse(`${operation}に失敗しました: ${errorMessage}`);
 }
 
 // レスポンスデータの安全な抽出

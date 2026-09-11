@@ -1,6 +1,7 @@
 import { env } from "../config/environment.js";
 import { API_BASE_URL } from "../config/api-config.js";
 import fetch from "node-fetch";
+import { redactSensitiveValues } from "./safe-logging.js";
 
 // 動的セッション情報を保持する変数
 let activeSessionCookie: string | null = null;
@@ -54,7 +55,7 @@ export async function loginToNote(): Promise<boolean> {
 
   try {
     if (env.DEBUG) {
-      console.error(`Attempting login to ${loginUrl}`);
+      console.error("note login started");
     }
 
     const response = await fetch(loginUrl, {
@@ -89,7 +90,7 @@ export async function loginToNote(): Promise<boolean> {
         console.error("Login successful. Session token obtained.");
       }
     } catch (e) {
-      if (env.DEBUG) console.error("Failed to parse response body as JSON:", e);
+      if (env.DEBUG) console.error("Failed to parse note login response");
     }
 
     // Set-Cookieヘッダーからの取得方法も残す
@@ -162,7 +163,7 @@ export async function loginToNote(): Promise<boolean> {
           // activeXsrfToken がここでセットされていれば、後続の処理に進む
         }
       } catch (error) {
-        console.error("Error fetching current_user for XSRF token:", error);
+        console.error("Error fetching current_user for XSRF token");
       }
     }
     // console.log(`>>> After current_user API call: activeXsrfToken = ${activeXsrfToken}`);
@@ -186,7 +187,7 @@ export async function loginToNote(): Promise<boolean> {
 
     return activeSessionCookie !== null;
   } catch (error) {
-    console.error("Error during login:", error);
+    console.error(`Error during note login: ${redactSensitiveValues(error)}`);
     return false;
   }
 }
@@ -267,7 +268,7 @@ export async function getPreviewAccessToken(noteId: string): Promise<string | nu
   headers["Content-Type"] = "application/json"; // POSTリクエストのため
 
   if (env.DEBUG) {
-    console.error(`Attempting to get preview_access_token for noteId ${noteId} from ${url}`);
+    console.error("preview access token request started");
   }
 
   try {
@@ -283,9 +284,7 @@ export async function getPreviewAccessToken(noteId: string): Promise<string | nu
     }
 
     if (!response.ok) {
-      console.error(
-        `Failed to get preview_access_token: ${response.status} ${response.statusText} - ${responseText}`
-      );
+      console.error(`Failed to get preview_access_token: ${response.status}`);
       return null;
     }
 
@@ -300,7 +299,7 @@ export async function getPreviewAccessToken(noteId: string): Promise<string | nu
       return null;
     }
   } catch (error) {
-    console.error("Error obtaining preview_access_token:", error);
+    console.error(`Error obtaining preview_access_token: ${redactSensitiveValues(error)}`);
     return null;
   }
 }
