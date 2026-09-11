@@ -7,7 +7,6 @@ import { redactSensitiveValues } from "./safe-logging.js";
 let activeSessionCookie: string | null = null;
 let activeXsrfToken: string | null = null;
 let activeUserKey: string | null = null;
-let activeGqlAuthToken: string | null = null;
 
 export function getActiveSessionCookie(): string | null {
   return activeSessionCookie;

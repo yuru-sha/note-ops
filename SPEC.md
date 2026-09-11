@@ -62,6 +62,6 @@ npm test
 
 It must build the TypeScript entry point and pass the offline tests for the MVP tool list and Markdown conversion. Live note.com API checks require user-provided credentials and are separate from this gate.
 
-## Planned work
+## Change policy
 
-The cleanup and expansion work is tracked in GitHub Issues [#1](https://github.com/yuru-sha/note-ops/issues/1) through [#4](https://github.com/yuru-sha/note-ops/issues/4). A change that expands the default tool surface updates this specification and its offline registration check together.
+Changes that expand the default tool surface must update this specification and its offline registration check together.
