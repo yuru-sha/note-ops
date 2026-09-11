@@ -19,6 +19,12 @@ test("Markdown is converted without double-wrapping HTML", () => {
   assert.match(html, /<h2[^>]*>Title<\/h2>/);
   assert.match(html, /<ul[^>]*><li[^>]*>item<\/li><\/ul>/);
   assert.equal(looksLikeHtml("<p>already converted</p>"), true);
+
+  const richHtml = convertMarkdownToNoteHtml(
+    "```ts\nconst x = 1 < 2;\n```\n\n[docs](https://example.com)"
+  );
+  assert.match(richHtml, /<pre[^>]*><code[^>]*>const x = 1 &lt; 2;<\/code><\/pre>/);
+  assert.match(richHtml, /<a href="https:\/\/example\.com"[^>]*>docs<\/a>/);
 });
 
 test("Authentication secrets are redacted from errors and logs", () => {
