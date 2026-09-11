@@ -1,108 +1,32 @@
-# 依存関係
 node_modules/
-
-# ビルド出力
 build/
 dist/
 
-# 環境変数ファイル（機密情報を含むため）
+# Local credentials
 .env
-.env.vps
+.env.*
+!.env.sample
 
-# ログファイル
+# Logs and local tooling
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-
-# エディタ設定
 .idea/
 .vscode/
 *.swp
 *.swo
-
-# OS固有のファイル
 .DS_Store
 Thumbs.db
 
-# テスト・ドラフトファイル
+# Local drafts and scratch files
 *-draft.md
 test-*.md
-
-# 個人的な開発記録（公開しない）
-docs/DRAFT_CREATION_SUCCESS_STORY.md
-
-# 完全開発ガイド（個人情報や具体的な実装詳細を含むため）
-docs/NOTE_MCP_DEVELOPMENT_COMPLETE_GUIDE.md
-
-# Cloudflare設定（トンネルID、ドメイン名等の個人情報を含む）
-.cloudflared/
-
-# 個人的な設定ファイル（ユーザー名、パス、Webhook URL等の個人情報を含む）
-scripts/cloudflare-tunnel.service
-scripts/monitor-services.sh
-scripts/setup-cloudflare-tunnel.sh
-scripts/manage-services.sh
-scripts/deploy-vps.sh
-
-# MCP設定ファイル（個人ドメイン情報含む）
-private.mcp.json
-claude-desktop-config.json
-cursor-mcp-config.json
-n8n-http-request-example.json
-
-# Nginx設定（個人ドメイン情報含む）
-config/nginx-note-mcp.conf
-nginx-reverse-proxy.conf
-
-# クライアントコード（開発中）
 client/
-
-# ログディレクトリ
 logs/
 
-# Obsidianプラグイン（別リポジトリで管理）
-obsidian-to-note-publisher/
-
-# n8n関連ドキュメント（note-MCPの直接的な機能ではないため）
-DEPLOYMENT.md
-SUCCESS_STORY.md
-TUTORIAL_COMPLETE_MCP_SETUP.md
-
-# 開発メモ・リファクタリング記録
-REFACTORING.md
-business-plan-draft.md
-
-# 特定環境向けデプロイガイド
-XSERVER_DEPLOY.md
-
-# テストファイル
-linebreak-test.md
-markdown-test-sample.md
-test-article-draft.md
-test-stdio-md.json
-test-stdio-server.js
-
-# 開発用ドキュメント
-docs/2025-12-21-auth-debug.md
-docs/API_CAPTURE_GUIDE.md
-docs/CLOUDFLARE_TUNNEL_SETUP.md
-docs/DEPLOYMENT_GUIDE.md
-docs/DEVELOPMENT_NOTES.md
-docs/DEVELOPMENT_NOTES_EYECATCH_IMPLEMENTATION.md
-docs/DEVELOPMENT_NOTES_IMAGE_API.md
-docs/DEVELOPMENT_NOTES_OBSIDIAN.md
-docs/IMAGE_UPLOAD_GUIDE.md
-docs/IMAGE_UPLOAD_RESEARCH.md
-docs/README_DEVELOPMENT.md
-docs/playwright-image-insert-analysis.md
-docs/2025-12-25-caption-implementation.md
-docs/2026-02-20-auth-fix.md
-docs/2026-03-02-note-toc-structure-analysis.md
-
-# Machine-local agent links; keep only project-owned skills versioned.
+# Machine-local agent configuration
 .agents/agent-capabilities/
-.codex/agents/
 .agents/skills/*
+.codex/agents/
 .codex/config.toml
-
