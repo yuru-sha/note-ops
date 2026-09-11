@@ -1,4 +1,4 @@
-import { env, authStatus } from "../config/environment.js";
+import { env } from "../config/environment.js";
 import { API_BASE_URL } from "../config/api-config.js";
 import fetch from "node-fetch";
 
@@ -33,8 +33,12 @@ export function setActiveXsrfToken(token: string): void {
 }
 
 export function hasAuth(): boolean {
-  // GQLトークンはもう追跡しないので、セッションCookieの有無を主とする
-  return activeSessionCookie !== null || authStatus.anyAuth;
+  return Boolean(
+    activeSessionCookie ||
+      env.NOTE_SESSION_V5 ||
+      process.env.NOTE_ALL_COOKIES ||
+      (env.NOTE_EMAIL && env.NOTE_PASSWORD)
+  );
 }
 
 // noteへのログイン処理を行う関数
@@ -67,14 +71,10 @@ export async function loginToNote(): Promise<boolean> {
     const responseText = await response.text();
     if (env.DEBUG) {
       console.error(`Login response: ${response.status} ${response.statusText}`);
-      console.error(
-        `Login response headers: ${JSON.stringify(Object.fromEntries(response.headers.entries()))}`
-      );
-      console.error(`Login response body: ${responseText}`);
     }
 
     if (!response.ok) {
-      console.error(`Login failed: ${response.status} ${response.statusText} - ${responseText}`);
+      console.error(`Login failed: ${response.status} ${response.statusText}`);
       return false;
     }
 
@@ -83,13 +83,10 @@ export async function loginToNote(): Promise<boolean> {
       responseData = JSON.parse(responseText); // 関数スコープのresponseDataに代入
       if (responseData?.data?.key) {
         setActiveUserKey(responseData.data.key);
-        if (env.DEBUG) console.error("User key set:", responseData.data.key);
       }
       if (responseData && responseData.data && responseData.data.token) {
         activeSessionCookie = `_note_session_v5=${responseData.data.token}`;
-        if (env.DEBUG)
-          console.error("Session token found in response body:", responseData.data.token);
-        console.error("Login successful. Session token obtained from response body.");
+        console.error("Login successful. Session token obtained.");
       }
     } catch (e) {
       if (env.DEBUG) console.error("Failed to parse response body as JSON:", e);
@@ -98,19 +95,15 @@ export async function loginToNote(): Promise<boolean> {
     // Set-Cookieヘッダーからの取得方法も残す
     const setCookieHeader = response.headers.get("set-cookie");
     if (setCookieHeader) {
-      // console.error(`>>> Before final log: activeXsrfToken = ${activeXsrfToken}`);
-      console.error("Set-Cookie header:", setCookieHeader);
       const cookies = Array.isArray(setCookieHeader) ? setCookieHeader : [setCookieHeader];
       cookies.forEach((cookieStr) => {
         if (cookieStr.includes("_note_session_v5=")) {
           // セッションCookieを保存
           activeSessionCookie = cookieStr.split(";")[0];
-          console.error("Session cookie set:", activeSessionCookie);
         } else if (cookieStr.includes("XSRF-TOKEN=")) {
           // XSRFトークンを保存（Cookieから）
           const tokenValue = cookieStr.split(";")[0].split("=")[1];
           activeXsrfToken = decodeURIComponent(tokenValue);
-          console.error("XSRF token set from cookie:", activeXsrfToken);
         }
       });
     }
@@ -118,7 +111,6 @@ export async function loginToNote(): Promise<boolean> {
     const responseXsrfToken = response.headers.get("x-xsrf-token");
     if (responseXsrfToken) {
       activeXsrfToken = decodeURIComponent(responseXsrfToken);
-      if (env.DEBUG) console.error("XSRF Token from header:", activeXsrfToken);
     } else if (env.DEBUG && !activeXsrfToken) {
       console.error("XSRF Token not found in initial login headers.");
     }
@@ -151,7 +143,6 @@ export async function loginToNote(): Promise<boolean> {
         if (xsrfToken) {
           activeXsrfToken = decodeURIComponent(xsrfToken);
           console.error("XSRF token successfully obtained from current_user API.");
-          if (env.DEBUG) console.error("XSRF Token:", activeXsrfToken);
         } else {
           // Set-Cookieヘッダーからも確認
           const currentUserSetCookieHeader = currentUserResponse.headers.get("set-cookie");
@@ -164,7 +155,6 @@ export async function loginToNote(): Promise<boolean> {
               if (cookieStr.includes("XSRF-TOKEN=")) {
                 activeXsrfToken = decodeURIComponent(cookieStr.split(";")[0].split("=")[1]);
                 console.error("XSRF token found in current_user response cookies.");
-                if (env.DEBUG) console.error("XSRF Token from cookie:", activeXsrfToken);
               }
             });
           }
@@ -278,7 +268,6 @@ export async function getPreviewAccessToken(noteId: string): Promise<string | nu
 
   if (env.DEBUG) {
     console.error(`Attempting to get preview_access_token for noteId ${noteId} from ${url}`);
-    console.error(`Request headers for preview_access_token: ${JSON.stringify(headers)}`);
   }
 
   try {
@@ -291,10 +280,6 @@ export async function getPreviewAccessToken(noteId: string): Promise<string | nu
     const responseText = await response.text();
     if (env.DEBUG) {
       console.error(`PreviewAccessToken API response: ${response.status} ${response.statusText}`);
-      console.error(
-        `PreviewAccessToken API response headers: ${JSON.stringify(Object.fromEntries(response.headers.entries()))}`
-      );
-      console.error(`PreviewAccessToken API response body: ${responseText}`);
     }
 
     if (!response.ok) {
@@ -309,7 +294,6 @@ export async function getPreviewAccessToken(noteId: string): Promise<string | nu
 
     if (token) {
       console.error("Preview access token successfully obtained.");
-      if (env.DEBUG) console.error("Preview Access Token:", token);
       return token;
     } else {
       console.error("Preview access token not found in response.");

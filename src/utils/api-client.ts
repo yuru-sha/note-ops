@@ -16,28 +16,15 @@ export async function noteApiRequest(
     ...DEFAULT_HEADERS,
   };
 
-  // 認証ヘッダーを追加
-  if (requireAuth || hasAuth()) {
-    const authHeaders = buildAuthHeaders();
-    if (
-      requireAuth &&
-      Object.keys(authHeaders).length === 0 &&
-      env.NOTE_EMAIL &&
-      env.NOTE_PASSWORD
-    ) {
-      // 認証情報が必要で、メールアドレスとパスワードが設定されている場合はログイン試行
-      const loggedIn = await loginToNote();
-      if (loggedIn) {
-        const newAuthHeaders = buildAuthHeaders();
-        Object.assign(headers, newAuthHeaders);
-      } else {
-        throw new Error("認証が必要です。ログインに失敗しました。");
-      }
-    } else if (requireAuth && Object.keys(authHeaders).length === 0) {
-      throw new Error("認証情報が必要です。.envファイルに認証情報を設定してください。");
+  // 認証ヘッダーを追加。XSRFトークンだけでは認証済みとみなさない。
+  if (requireAuth && !hasAuth()) {
+    if (env.NOTE_EMAIL && env.NOTE_PASSWORD && (await loginToNote())) {
+      Object.assign(headers, buildAuthHeaders());
     } else {
-      Object.assign(headers, authHeaders);
+      throw new Error("認証情報が必要です。.envファイルを確認してください。");
     }
+  } else if (hasAuth()) {
+    Object.assign(headers, buildAuthHeaders());
   }
 
   // POST/PUTリクエストの場合、OriginとRefererヘッダーを追加（CSRF対策）
@@ -68,10 +55,7 @@ export async function noteApiRequest(
   try {
     if (env.DEBUG) {
       console.error(`Requesting ${API_BASE_URL}${endpoint}`);
-      console.error(`Request Headers: ${JSON.stringify(headers)}`);
-      if (body && (method === "POST" || method === "PUT")) {
-        console.error(`Request Body: ${JSON.stringify(body)}`);
-      }
+      console.error(`Request headers prepared: ${Object.keys(headers).join(", ")}`);
     }
 
     const response = await fetch(`${API_BASE_URL}${endpoint}`, options);
@@ -88,7 +72,7 @@ export async function noteApiRequest(
         console.error(
           `API error on endpoint ${endpoint}: ${response.status} ${response.statusText}`
         );
-        console.error(`API error response body: ${errorText}`);
+        console.error(`API error response received: ${response.status}`);
 
         // エンドポイントのバージョンをチェック
         if (endpoint.includes("/v1/") || endpoint.includes("/v3/")) {

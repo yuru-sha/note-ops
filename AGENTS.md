@@ -1,0 +1,31 @@
+# Agent instructions
+
+Read `SPEC.md` before changing code. Treat it as the authoritative contract for the default server.
+
+## Working sequence
+
+1. Inspect the current diff and the files named by the task.
+2. Keep the default entry point in `src/index.ts` and the default tool surface in `src/tools/mvp-tools.ts`.
+3. Reuse the existing API client, authentication, error handling, and Markdown conversion utilities.
+4. Keep mutations on the draft-save path. A request to publish, comment, like, upload images, or add an integration requires an explicit scope change and a `SPEC.md` update.
+5. Add or update one small offline regression check for non-trivial behavior.
+6. Run `npm test` and report the result. Treat live note.com checks as separate because they require credentials.
+
+## Safety and privacy
+
+- Keep credentials in environment variables or the user's existing local session configuration.
+- Log operation names and HTTP status only. Credential values, cookies, XSRF tokens, passwords, and full response bodies remain private.
+- Encode note IDs and keys before placing them in paths or URLs.
+- Preserve the stdio-only default until the HTTP/n8n requirement is explicitly accepted.
+
+## Scope and style
+
+- Prefer the smallest change that satisfies `SPEC.md`.
+- Use existing dependencies and standard Node.js facilities before adding code or packages.
+- Leave legacy, non-MVP source files unreachable from the default TypeScript entry point until their cleanup is explicitly scoped.
+- Keep public behavior backward compatible within the five-tool MVP contract.
+- Update `SPEC.md` when tool behavior, authentication, transport, or safety boundaries change.
+
+## Git
+
+The agent may edit and verify the working tree. Commits, branches, pushes, and pull requests require an explicit user request.
