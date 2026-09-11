@@ -2,8 +2,8 @@
   "mcpServers": {
     "note-api": {
       "command": "node",
-      "args": ["build/note-mcp-server.js"],
-      "cwd": "/path/to/noteMCP"
+      "args": ["build/index.js"],
+      "cwd": "/path/to/note-ops"
     }
   }
 }

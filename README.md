@@ -1,8 +1,8 @@
-# note.com MCP Server
+# note-ops
 
-note.comのAPIを利用して、Claude Desktop、Claude Code、Cursor、n8nなどのMCPクライアントから記事の検索・投稿・分析ができるMCPサーバーです。
+note.comの記事と下書きを管理するための最小MCPサーバーです。
 
-stdio（ローカル）とHTTP（リモート）の両方のトランスポートに対応しています。
+現在はローカルstdioトランスポートと、下書き中心のMVPだけを提供します。
 
 ---
 
@@ -11,10 +11,9 @@ stdio（ローカル）とHTTP（リモート）の両方のトランスポー�
 ### 1. インストール
 
 ```bash
-git clone https://github.com/shimayuz/note-com-mcp.git
-cd note-com-mcp
+git clone https://github.com/yuru-sha/note-ops.git
+cd note-ops
 npm install
-npx playwright install chromium  # ブラウザ自動ログイン用
 npm run build
 ```
 
@@ -30,11 +29,12 @@ cp .env.sample .env
 NOTE_EMAIL=your-email@example.com
 NOTE_PASSWORD=your-password
 NOTE_USER_ID=your_note_user_id
+# Existing session credentials are preferred for the MVP:
+# NOTE_SESSION_V5=your_session_cookie_value
+# NOTE_XSRF_TOKEN=your_xsrf_token
 ```
 
-起動時にPlaywrightが自動でheadlessログインを行い、セッションCookieを取得・更新します。手動でCookieを設定する必要はありません。
-
-**セキュリティ**: `.env`ファイルは`.gitignore`に含まれているため、リポジトリにコミットされません。
+`.env` は `.gitignore` に含まれています。認証値はログやMCPレスポンスに出力せず、コミットしないでください。
 
 ### 3. 起動
 
@@ -44,13 +44,7 @@ NOTE_USER_ID=your_note_user_id
 npm run start
 ```
 
-**HTTPモード（n8n / リモート接続）:**
-
-```bash
-npm run start:http
-# デフォルトポートは3000。変更する場合：
-MCP_HTTP_PORT=3001 node build/note-mcp-server.js
-```
+MVPではstdioモードのみを提供します。
 
 ## 🔌 トランスポート
 
@@ -59,42 +53,32 @@ MCP_HTTP_PORT=3001 node build/note-mcp-server.js
 ローカルのMCPクライアントから直接起動される標準的な接続方式です。
 
 ```bash
-node build/note-mcp-server.js
+node build/index.js
 ```
 
-### HTTPモード
+## ✨ MVPツール
 
-リモートクライアントやn8nから接続するためのHTTPベースの接続方式です。`MCP_HTTP_PORT`環境変数または`--http`フラグで有効化されます。
+| Tool | 用途 | 認証 |
+|---|---|---|
+| `get-my-notes` | 自分の記事・下書き一覧 | 必須 |
+| `get-note` | 記事・下書き詳細 | 必須 |
+| `post-draft-note` | 新規下書き作成・更新 | 必須 |
+| `edit-note` | 下書き保存（公開しない） | 必須 |
+| `open-note-editor` | 編集URL生成 | `NOTE_USER_ID` |
 
-```bash
-# 環境変数で指定
-MCP_HTTP_PORT=3000 node build/note-mcp-server.js
+## 📋 旧実装に残るTool一覧（MVP未登録）
 
-# CLIフラグで指定（ポートはMCP_HTTP_PORTまたはデフォルト3000）
-node build/note-mcp-server.js --http
-```
+MVPで有効なToolは次の5つです。
 
-| エンドポイント | メソッド | 説明 |
-|---------------|---------|------|
-| `/mcp` | POST | MCP JSON-RPCリクエスト |
-| `/mcp` | GET | SSEストリーム |
-| `/mcp` | DELETE | セッション終了 |
-| `/health` | GET | ヘルスチェック |
+- `get-my-notes` - 自分の記事・下書き一覧
+- `get-note` - 記事・下書き詳細
+- `post-draft-note` - 新規下書き作成・更新
+- `edit-note` - 下書き保存（公開しない）
+- `open-note-editor` - 編集URL生成
 
-デフォルトのバインドアドレスは`127.0.0.1`です。`MCP_HTTP_HOST`環境変数で変更できます。
+検索、画像、コメント、スキ、公開、Notion、Obsidian、HTTP/n8n、メンバーシップはMVP対象外です。
 
-## ✨ 主な機能
-
-| カテゴリ | 機能 | 認証 |
-|---------|------|------|
-| 🔍 検索 | 記事検索、ユーザー検索、ハッシュタグ検索 | 不要 |
-| 📊 分析 | 記事分析、エンゲージメント分析 | 不要 |
-| ✍️ 投稿 | 下書き作成、画像付き投稿 | 必須 |
-| 🖼️ 画像 | 画像アップロード、アイキャッチ設定 | 必須 |
-| 💬 コメント | コメント投稿、スキ機能 | 必須 |
-| 📈 統計 | PV数、アクセス解析 | 必須 |
-
-## 📋 利用可能なツール
+以下の一覧は移行前の実装に残っているToolの記録で、MVPのデフォルトサーバーには登録されません。
 
 ### 検索・分析（認証不要）
 
@@ -148,7 +132,7 @@ node build/note-mcp-server.js --http
   "mcpServers": {
     "note-api": {
       "command": "node",
-      "args": ["/path/to/note-com-mcp/build/note-mcp-server.js"],
+      "args": ["/path/to/note-ops/build/index.js"],
       "env": {
         "NOTE_EMAIL": "your_email@example.com",
         "NOTE_PASSWORD": "your_password",
@@ -168,8 +152,8 @@ node build/note-mcp-server.js --http
   "mcpServers": {
     "note-api": {
       "command": "node",
-      "args": ["/path/to/note-com-mcp/build/note-mcp-server.js"],
-      "cwd": "/path/to/note-com-mcp",
+      "args": ["/path/to/note-ops/build/index.js"],
+      "cwd": "/path/to/note-ops",
       "env": {
         "NOTE_EMAIL": "your_email@example.com",
         "NOTE_PASSWORD": "your_password",
@@ -189,7 +173,7 @@ node build/note-mcp-server.js --http
   "mcpServers": {
     "note-api": {
       "command": "node",
-      "args": ["/path/to/note-com-mcp/build/note-mcp-server.js"],
+      "args": ["/path/to/note-ops/build/index.js"],
       "env": {
         "NOTE_EMAIL": "your_email@example.com",
         "NOTE_PASSWORD": "your_password",
@@ -209,7 +193,7 @@ node build/note-mcp-server.js --http
   "mcpServers": {
     "note-api": {
       "command": "node",
-      "args": ["/path/to/note-com-mcp/build/note-mcp-server.js"],
+      "args": ["/path/to/note-ops/build/index.js"],
       "env": {
         "NOTE_EMAIL": "your_email@example.com",
         "NOTE_PASSWORD": "your_password",
@@ -220,44 +204,11 @@ node build/note-mcp-server.js --http
 }
 ```
 
-> `/path/to/note-com-mcp` は実際のプロジェクトの絶対パスに置き換えてください。
-
-### n8n（HTTP経由）
-
-1. HTTPサーバーを起動：
-
-```bash
-npm run start:http
-```
-
-2. n8nで「MCP Client HTTP Streamable」ノードを設定：
-
-```
-HTTP Stream URL: http://127.0.0.1:3000/mcp
-HTTP Connection Timeout: 60000
-```
-
-## 🌐 リモートアクセス（Cloudflare Tunnel）
-
-VPSでn8nを使用する場合、Cloudflare Tunnelで安全に接続できます：
-
-```bash
-# 1. Cloudflare Tunnelを設定
-cloudflared tunnel run note-mcp
-
-# 2. n8nでHTTPS URLを設定
-# HTTPS Stream URL: https://your-domain.com/mcp
-```
+> `/path/to/note-ops` は実際のプロジェクトの絶対パスに置き換えてください。
 
 ## 🔐 認証フロー
 
-起動時に以下の順序で認証情報を取得します：
-
-1. `NOTE_EMAIL` / `NOTE_PASSWORD` が設定されている場合、Playwrightでheadlessログインを実行し、最新のセッションCookieを自動取得
-2. Playwright失敗時は `.env` の既存Cookie情報にフォールバック
-3. どちらもない場合はPlaywrightがブラウザを開き、手動ログインを求める
-
-セッションCookieは自動で`.env`に永続化されるため、次回起動時にも利用可能です。
+MVPでは `NOTE_SESSION_V5` と `NOTE_XSRF_TOKEN` を優先して使用します。`NOTE_EMAIL` と `NOTE_PASSWORD` による直接ログインも利用できます。認証値をログへ出力しないでください。
 
 ## 📝 Markdown変換ルール
 
@@ -273,30 +224,16 @@ cloudflared tunnel run note-mcp
 
 ## 💡 使い方の例
 
-### 記事検索（認証不要）
+### 下書き保存（認証必須）
 
 ```
-noteで「プログラミング」に関する人気記事を検索して
-```
-
-### 画像付き投稿（認証必須）
-
-```
-タイトル「技術メモ」、本文「## 概要\n\n![[screenshot.png]]」で下書きを作成して
-```
-
-### 記事分析（認証不要）
-
-```
-ユーザー「username」の記事を分析して、人気の要因を教えて
+タイトル「技術メモ」、本文「## 概要\n\n本文」で下書きを作成して
 ```
 
 ## ⚠️ 注意点
 
 - **投稿機能**: 下書き作成のみ対応です。公開はnote.comから直接行ってください
-- **画像**: サポート形式はPNG、JPEG、GIFです（最大10MB）
-- **検索結果**: 最大20件まで取得できます
-- **認証**: セッションCookieは約1~2週間で期限切れになりますが、メール/パスワード設定済みなら自動更新されます
+- **認証**: note.comの非公開API仕様変更で動作しなくなる可能性があります
 
 ## 🛠️ 開発
 
@@ -307,8 +244,8 @@ npm run build
 # 開発モード（ファイル監視）
 npm run dev:watch
 
-# HTTPサーバー開発
-npm run dev:http
+# オフライン回帰テスト
+npm test
 ```
 
 ## 📄 ライセンス
