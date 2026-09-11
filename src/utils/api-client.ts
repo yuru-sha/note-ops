@@ -54,39 +54,15 @@ export async function noteApiRequest(
 
   try {
     if (env.DEBUG) {
-      console.error(`Requesting ${API_BASE_URL}${endpoint}`);
-      console.error(`Request headers prepared: ${Object.keys(headers).join(", ")}`);
+      console.error(`API request: auth=${hasAuth() ? "present" : "absent"}`);
     }
 
     const response = await fetch(`${API_BASE_URL}${endpoint}`, options);
+    if (env.DEBUG) console.error(`API response: status=${response.status}`);
 
     if (!response.ok) {
-      let errorText = "";
-      try {
-        errorText = await response.text();
-      } catch (e) {
-        errorText = "（レスポンステキストの取得に失敗）";
-      }
-
       if (env.DEBUG) {
-        console.error(
-          `API error on endpoint ${endpoint}: ${response.status} ${response.statusText}`
-        );
-        console.error(`API error response received: ${response.status}`);
-
-        // エンドポイントのバージョンをチェック
-        if (endpoint.includes("/v1/") || endpoint.includes("/v3/")) {
-          console.error(
-            `Note: This endpoint uses API version ${endpoint.includes("/v1/") ? "v1" : "v3"}. Consider trying v2 version if available.`
-          );
-          if (endpoint.includes("/v3/notes/")) {
-            const altPath = endpoint.replace("/v3/notes/", "/v2/notes/");
-            console.error(`Alternative endpoint suggestion: ${altPath}`);
-          } else if (endpoint.includes("/v3/searches")) {
-            const altPath = endpoint.replace("/v3/searches", "/v2/searches");
-            console.error(`Alternative endpoint suggestion: ${altPath}`);
-          }
-        }
+        console.error(`API error: status=${response.status}`);
       }
 
       // エラー種別ごとの詳細な説明
@@ -95,21 +71,17 @@ export async function noteApiRequest(
           "認証エラー: noteへのアクセス権限がありません。認証情報を確認してください。"
         );
       } else if (response.status === 404) {
-        console.error(
-          `404 Not Found: エンドポイント ${endpoint} が存在しないか、変更された可能性があります。APIバージョンを確認してください。`
-        );
-      } else if (response.status === 400) {
-        console.error(`400 Bad Request: リクエストパラメータが不正な可能性があります。`);
+        throw new Error("API error: 404 Not Found");
       }
 
-      throw new Error(`API error: ${response.status} ${response.statusText} - ${errorText}`);
+      throw new Error(`API error: ${response.status} ${response.statusText}`);
     }
 
     const data = (await response.json()) as NoteApiResponse;
     return data;
   } catch (error) {
     if (env.DEBUG) {
-      console.error(`Error calling note API: ${error}`);
+      console.error("API request failed");
     }
     throw error;
   }
