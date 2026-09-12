@@ -14,6 +14,7 @@ import {
   extractNotePayload,
   normalizeNoteListResponse,
   noteBelongsToUser,
+  selectNotesPage,
 } from "../utils/note-normalizers.js";
 
 export const MVP_TOOL_NAMES = [
@@ -75,6 +76,33 @@ async function resolveNumericNoteId(noteId: string): Promise<string> {
   return String(payload.id || noteId);
 }
 
+async function fetchNoteListPage(
+  page: number,
+  perPage: number,
+  status: "all" | "draft" | "public"
+): Promise<{ notes: any[]; total: number; isLastPage: boolean }> {
+  const params = new URLSearchParams({
+    page: String(page),
+    per_page: String(perPage),
+    draft: "true",
+    draft_reedit: "false",
+    ts: String(Date.now()),
+  });
+  if (status !== "all") params.set("status", status);
+
+  const result = await noteApiRequest(
+    `/v2/note_list/contents?${params.toString()}`,
+    "GET",
+    null,
+    true
+  );
+  const normalized = normalizeNoteListResponse(result);
+  return {
+    ...normalized,
+    isLastPage: Boolean((result.data as any)?.isLastPage),
+  };
+}
+
 export function registerMvpTools(server: McpServer): void {
   server.tool(
     "get-my-notes",
@@ -90,24 +118,21 @@ export function registerMvpTools(server: McpServer): void {
           return createErrorResponse("環境変数 NOTE_USER_ID が設定されていません。");
         }
 
-        const params = new URLSearchParams({
-          page: String(page),
-          per_page: String(perPage),
-          draft: "true",
-          draft_reedit: "false",
-          ts: String(Date.now()),
-        });
-        if (status !== "all") params.set("status", status);
-
-        const result = await noteApiRequest(
-          `/v2/note_list/contents?${params.toString()}`,
-          "GET",
-          null,
-          true
-        );
-        const { notes, total } = normalizeNoteListResponse(result);
+        let upstreamPage = 1;
+        let total = 0;
+        let isLastPage = false;
+        const allNotes: any[] = [];
+        const requestedEnd = page * perPage;
+        while (allNotes.length < requestedEnd && !isLastPage) {
+          const current = await fetchNoteListPage(upstreamPage, perPage, status);
+          total = current.total;
+          allNotes.push(...current.notes);
+          isLastPage = current.isLastPage || current.notes.length === 0 || allNotes.length >= total;
+          upstreamPage += 1;
+        }
+        const notes = selectNotesPage(allNotes, page, perPage);
         const formatted = notes.map((note: any) => {
-          const draft = note.noteDraft;
+          const draft = note.noteDraft || note.note_draft;
           const body = note.body || draft?.body || "";
           const key = note.key || "";
           const encodedKey = encodeURIComponent(key || note.id || "");

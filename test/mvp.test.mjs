@@ -5,9 +5,11 @@ import {
   extractNotePayload,
   normalizeNoteListResponse,
   noteBelongsToUser,
+  selectNotesPage,
 } from "../build/utils/note-normalizers.js";
 import { convertMarkdownToNoteHtml, looksLikeHtml } from "../build/utils/markdown-converter.js";
 import { createErrorResponse, handleApiError } from "../build/utils/error-handler.js";
+import { formatNote } from "../build/utils/formatters.js";
 
 test("MVP exposes only note management tools", () => {
   assert.deepEqual([...MVP_TOOL_NAMES], [
@@ -67,4 +69,19 @@ test("Note responses are normalized across authenticated API shapes", () => {
   assert.deepEqual(extractNotePayload({ data: { note: { id: 12 } } }), { id: 12 });
   assert.equal(noteBelongsToUser({ user: { urlname: "owner" } }, "owner"), true);
   assert.equal(noteBelongsToUser({ user: { urlname: "other" } }, "owner"), false);
+});
+
+test("Draft fields and requested note pages support API shape differences", () => {
+  const formatted = formatNote({
+    id: "12",
+    name: "Draft",
+    body: "",
+    user: { urlname: "owner" },
+    note_draft: { body: "<p>draft body</p>", updated_at: "2026-09-12" },
+  });
+
+  assert.equal(formatted.body, "<p>draft body</p>");
+  assert.equal(formatted.hasDraftContent, true);
+  assert.equal(formatted.lastUpdated, "2026-09-12");
+  assert.deepEqual(selectNotesPage([1, 2, 3, 4], 2, 2), [3, 4]);
 });
