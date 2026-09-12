@@ -131,7 +131,8 @@ async function main() {
     return;
   }
 
-  const draftReference = created.noteKey || created.noteId;
+  const draftReference = created.noteId;
+  const draftDetailReference = created.noteKey || created.noteId;
   await step("eyecatch upload", () =>
     invoke(handlers, "set-note-eyecatch", {
       noteId: draftReference,
@@ -139,7 +140,7 @@ async function main() {
     })
   );
   const updated = await step("eyecatch verification", () =>
-    invoke(handlers, "get-note", { noteId: draftReference })
+    invoke(handlers, "get-note", { noteId: draftDetailReference })
   );
   if (typeof updated.eyecatchUrl !== "string" || !updated.eyecatchUrl) {
     throw new Error("The smoke-test draft detail did not contain an eyecatch URL.");

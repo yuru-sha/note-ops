@@ -151,16 +151,39 @@ async function getCreateDraftEndpoint(): Promise<string> {
   return `/v1/text_notes?user_id=${encodeURIComponent(cachedNoteApiUserId)}`;
 }
 
+async function resolveDraftNoteKey(noteId: string): Promise<string> {
+  let page = 1;
+  while (true) {
+    const { notes, total } = await fetchNoteListPage(page, 100, "draft");
+    const note = notes.find((candidate: any) =>
+      [candidate?.id, candidate?.note_id, candidate?.noteId].some(
+        (value) => String(value ?? "") === noteId
+      )
+    );
+    if (note) {
+      ensureNoteOwnership(note);
+      const draft = note.noteDraft || note.note_draft;
+      const key = noteKeyFromPayload(note) || noteKeyFromPayload(draft);
+      if (key) return key;
+      throw new Error("数値IDに対応する記事キーを確認できませんでした。");
+    }
+    if (notes.length === 0 || page * 100 >= total) break;
+    page += 1;
+  }
+  throw new Error("指定された下書きが設定ユーザーの一覧に見つかりませんでした。");
+}
+
 async function resolveNoteReference(
   noteId: string
 ): Promise<{ id: string; key?: string; isDraft: boolean }> {
+  const noteReference = /^\d+$/.test(noteId) ? await resolveDraftNoteKey(noteId) : noteId;
   const params = new URLSearchParams({
     draft: "true",
     draft_reedit: "false",
     ts: String(Date.now()),
   });
   const result = await noteApiRequest(
-    `/v3/notes/${encodeURIComponent(noteId)}?${params}`,
+    `/v3/notes/${encodeURIComponent(noteReference)}?${params}`,
     "GET",
     null,
     true
@@ -170,7 +193,7 @@ async function resolveNoteReference(
   const key = noteKeyFromPayload(payload);
   return {
     id: String(payload.id || noteId),
-    key: key || (noteId.startsWith("n") ? noteId : undefined),
+    key: key || (noteReference.startsWith("n") ? noteReference : undefined),
     isDraft: isDraftNote(payload),
   };
 }
