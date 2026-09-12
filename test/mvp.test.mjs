@@ -27,7 +27,10 @@ import {
 import {
   assertCurrentUserMatchesConfiguredUser,
   extractXsrfTokenFromSetCookie,
+  getActiveXsrfToken,
   resolveXsrfToken,
+  setActiveSessionCookie,
+  setActiveXsrfToken,
 } from "../build/utils/auth.js";
 
 const repositoryRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -207,6 +210,12 @@ test("XSRF tokens are extracted from the named cookie", () => {
   );
 });
 
+test("Changing the active session discards the previous XSRF token", () => {
+  setActiveXsrfToken("old-xsrf");
+  setActiveSessionCookie("_note_session_v5=new-session");
+  assert.equal(getActiveXsrfToken(), null);
+});
+
 test("Note responses are normalized across authenticated API shapes", () => {
   const response = {
     data: {
@@ -227,6 +236,26 @@ test("Note responses are normalized across authenticated API shapes", () => {
   assert.equal(noteBelongsToUser({ user: { urlname: "owner" } }, "owner"), true);
   assert.equal(noteBelongsToUser({ user: { urlname: "other" } }, "owner"), false);
   assert.equal(noteOwnership({ id: 12 }, "owner"), "unknown");
+});
+
+test("Note ownership rejects conflicting identity fields", () => {
+  const verifiedUserIdentifiers = ["123", "owner"];
+  assert.equal(
+    noteOwnership(
+      { user: { id: "123", urlname: "other" } },
+      "123",
+      verifiedUserIdentifiers
+    ),
+    false
+  );
+  assert.equal(
+    noteOwnership(
+      { user: { id: "123", urlname: "owner" } },
+      "owner",
+      verifiedUserIdentifiers
+    ),
+    true
+  );
 });
 
 test("Draft fields and note-list queries match note.com response shapes", () => {

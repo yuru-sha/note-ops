@@ -8,6 +8,7 @@ let activeSessionCookie: string | null = null;
 let activeXsrfToken: string | null = null;
 let activeUserKey: string | null = null;
 let verifiedConfiguredUserId: string | null = null;
+let verifiedConfiguredUserIdentifiers: Set<string> | null = null;
 
 export function getActiveSessionCookie(): string | null {
   return activeSessionCookie;
@@ -27,7 +28,9 @@ export function setActiveUserKey(key: string): void {
 
 export function setActiveSessionCookie(cookie: string): void {
   activeSessionCookie = cookie;
+  activeXsrfToken = null;
   verifiedConfiguredUserId = null;
+  verifiedConfiguredUserIdentifiers = null;
 }
 
 export function setActiveXsrfToken(token: string): void {
@@ -47,10 +50,15 @@ export function hasSessionAuth(): boolean {
   return Boolean(activeSessionCookie || env.NOTE_SESSION_V5 || process.env.NOTE_ALL_COOKIES);
 }
 
-export function assertCurrentUserMatchesConfiguredUser(
-  currentUserResponse: any,
-  configuredUserId: string
-): void {
+export function getVerifiedConfiguredUserIdentifiers(): readonly string[] {
+  return verifiedConfiguredUserIdentifiers ? [...verifiedConfiguredUserIdentifiers] : [];
+}
+
+function currentUserIdentity(currentUserResponse: any): {
+  identifiers: string[];
+  numericIdentifiers: string[];
+  urlnameIdentifiers: string[];
+} {
   const user = [
     currentUserResponse?.data?.user,
     currentUserResponse?.data?.current_user,
@@ -61,7 +69,19 @@ export function assertCurrentUserMatchesConfiguredUser(
     .filter(Boolean)
     .map(String);
   const urlnameIdentifiers = [user?.urlname].filter(Boolean).map(String);
-  const identifiers = [...new Set([...numericIdentifiers, ...urlnameIdentifiers])];
+  return {
+    identifiers: [...new Set([...numericIdentifiers, ...urlnameIdentifiers])],
+    numericIdentifiers,
+    urlnameIdentifiers,
+  };
+}
+
+export function assertCurrentUserMatchesConfiguredUser(
+  currentUserResponse: any,
+  configuredUserId: string
+): void {
+  const { identifiers, numericIdentifiers, urlnameIdentifiers } =
+    currentUserIdentity(currentUserResponse);
 
   if (identifiers.length === 0) {
     throw new Error(
@@ -78,6 +98,7 @@ export function assertCurrentUserMatchesConfiguredUser(
       "current-userのユーザーIDがNOTE_USER_IDと一致しません。NOTE_USER_IDまたはセッションCookieを確認してください。"
     );
   }
+  verifiedConfiguredUserIdentifiers = new Set(identifiers);
 }
 
 export function extractXsrfTokenFromSetCookie(setCookieHeader: string): string | null {

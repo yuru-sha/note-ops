@@ -2,7 +2,10 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { env } from "../config/environment.js";
 import { noteApiRequest } from "../utils/api-client.js";
-import { buildAuthHeaders } from "../utils/auth.js";
+import {
+  buildAuthHeaders,
+  getVerifiedConfiguredUserIdentifiers,
+} from "../utils/auth.js";
 import {
   createErrorResponse,
   createSuccessResponse,
@@ -88,7 +91,11 @@ async function resolveNoteReference(noteId: string): Promise<{ id: string; key?:
 }
 
 function ensureNoteOwnership(note: any): void {
-  const ownership = noteOwnership(note, env.NOTE_USER_ID);
+  const ownership = noteOwnership(
+    note,
+    env.NOTE_USER_ID,
+    getVerifiedConfiguredUserIdentifiers()
+  );
   if (ownership === "unknown") {
     throw new Error("記事の所有者情報を確認できないため、安全のため操作を中止しました。");
   }
