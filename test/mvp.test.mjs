@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { MVP_TOOL_NAMES, buildNoteListQuery } from "../build/tools/mvp-tools.js";
 import {
@@ -12,6 +15,12 @@ import { createErrorResponse, handleApiError } from "../build/utils/error-handle
 import { formatNote } from "../build/utils/formatters.js";
 import { isLiveSmokeEnabled, isLiveDraftSmokeEnabled } from "../build/utils/live-smoke.js";
 
+const repositoryRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
+const workflowSkill = readFileSync(
+  join(repositoryRoot, "skills/note-management-workflow/SKILL.md"),
+  "utf8"
+);
+
 test("MVP exposes only note management tools", () => {
   assert.deepEqual([...MVP_TOOL_NAMES], [
     "get-my-notes",
@@ -20,6 +29,32 @@ test("MVP exposes only note management tools", () => {
     "edit-note",
     "open-note-editor",
   ]);
+});
+
+test("note workflow skill documents the safe five-tool contract", () => {
+  const allowedTools = [
+    "get-my-notes",
+    "get-note",
+    "post-draft-note",
+    "edit-note",
+    "open-note-editor",
+  ];
+  const toolSection = workflowSkill.match(
+    /The only permitted note-management MCP tools are:\n\n((?:- `[^`]+`\n?)+)/
+  )?.[1];
+  assert.ok(toolSection);
+  assert.deepEqual(
+    [...toolSection.matchAll(/`([^`]+)`/g)].map(([, tool]) => tool),
+    allowedTools
+  );
+  assert.match(workflowSkill, /explicit confirmation/i);
+  assert.ok(
+    workflowSkill.indexOf("explicit confirmation") < workflowSkill.indexOf("post-draft-note")
+  );
+  assert.match(workflowSkill, /MCP server remains the execution boundary/i);
+  for (const boundary of ["publish", "comment", "like", "upload images", "other users"]) {
+    assert.match(workflowSkill, new RegExp(boundary, "i"));
+  }
 });
 
 test("Live smoke tests require both explicit opt-in flags", () => {
