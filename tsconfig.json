@@ -10,6 +10,6 @@
     "outDir": "./build",
     "rootDir": "./src"
   },
-  "include": ["src/index.ts", "src/tools/mvp-tools.ts"],
+  "include": ["src/index.ts", "src/tools/mvp-tools.ts", "src/utils/live-smoke.ts"],
   "exclude": ["node_modules"]
 }

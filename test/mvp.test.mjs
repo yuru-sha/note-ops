@@ -10,6 +10,7 @@ import {
 import { convertMarkdownToNoteHtml, looksLikeHtml } from "../build/utils/markdown-converter.js";
 import { createErrorResponse, handleApiError } from "../build/utils/error-handler.js";
 import { formatNote } from "../build/utils/formatters.js";
+import { isLiveSmokeEnabled, isLiveDraftSmokeEnabled } from "../build/utils/live-smoke.js";
 
 test("MVP exposes only note management tools", () => {
   assert.deepEqual([...MVP_TOOL_NAMES], [
@@ -19,6 +20,19 @@ test("MVP exposes only note management tools", () => {
     "edit-note",
     "open-note-editor",
   ]);
+});
+
+test("Live smoke tests require both explicit opt-in flags", () => {
+  assert.equal(isLiveSmokeEnabled({ NOTE_LIVE_TESTS: "true" }), true);
+  assert.equal(isLiveSmokeEnabled({ NOTE_LIVE_TESTS: "1" }), false);
+  assert.equal(
+    isLiveDraftSmokeEnabled({ NOTE_LIVE_TESTS: "true", NOTE_LIVE_DRAFT_TESTS: "true" }),
+    true
+  );
+  assert.equal(
+    isLiveDraftSmokeEnabled({ NOTE_LIVE_TESTS: "true", NOTE_LIVE_DRAFT_TESTS: "false" }),
+    false
+  );
 });
 
 test("Markdown is converted without double-wrapping HTML", () => {
