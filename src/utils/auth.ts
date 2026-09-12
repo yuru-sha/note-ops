@@ -1,5 +1,5 @@
 import { env } from "../config/environment.js";
-import { API_BASE_URL } from "../config/api-config.js";
+import { API_BASE_URL, DEFAULT_HEADERS } from "../config/api-config.js";
 import fetch from "node-fetch";
 import { redactSensitiveValues } from "./safe-logging.js";
 
@@ -7,6 +7,7 @@ import { redactSensitiveValues } from "./safe-logging.js";
 let activeSessionCookie: string | null = null;
 let activeXsrfToken: string | null = null;
 let activeUserKey: string | null = null;
+let verifiedConfiguredUserId: string | null = null;
 
 export function getActiveSessionCookie(): string | null {
   return activeSessionCookie;
@@ -26,6 +27,7 @@ export function setActiveUserKey(key: string): void {
 
 export function setActiveSessionCookie(cookie: string): void {
   activeSessionCookie = cookie;
+  verifiedConfiguredUserId = null;
 }
 
 export function setActiveXsrfToken(token: string): void {
@@ -43,6 +45,90 @@ export function hasAuth(): boolean {
 
 export function hasSessionAuth(): boolean {
   return Boolean(activeSessionCookie || env.NOTE_SESSION_V5 || process.env.NOTE_ALL_COOKIES);
+}
+
+export function assertCurrentUserMatchesConfiguredUser(
+  currentUserResponse: any,
+  configuredUserId: string
+): void {
+  const candidates = [
+    currentUserResponse?.data?.user,
+    currentUserResponse?.data?.current_user,
+    currentUserResponse?.user,
+    currentUserResponse?.data,
+  ];
+  const identifiers = candidates.flatMap((user) =>
+    [user?.id, user?.urlname, user?.user_id, user?.userId].filter(Boolean).map(String)
+  );
+
+  if (identifiers.length === 0) {
+    throw new Error(
+      "current-userのユーザーIDを確認できません。セッションCookieとNOTE_USER_IDを確認してください。"
+    );
+  }
+  if (!identifiers.includes(configuredUserId)) {
+    throw new Error(
+      "current-userのユーザーIDがNOTE_USER_IDと一致しません。NOTE_USER_IDまたはセッションCookieを確認してください。"
+    );
+  }
+}
+
+function captureXsrfToken(response: any): void {
+  const responseXsrfToken = response.headers.get("x-xsrf-token");
+  if (responseXsrfToken) {
+    activeXsrfToken = decodeURIComponent(responseXsrfToken);
+    return;
+  }
+
+  const setCookieHeader = response.headers.get("set-cookie");
+  if (!setCookieHeader) return;
+  if (setCookieHeader.includes("XSRF-TOKEN=")) {
+    activeXsrfToken = decodeURIComponent(setCookieHeader.split(";")[0].split("=")[1]);
+  }
+}
+
+export async function ensureAuthenticatedUser(): Promise<void> {
+  if (!env.NOTE_USER_ID) {
+    throw new Error("NOTE_USER_IDが必要です。設定ユーザーを指定してください。");
+  }
+  if (verifiedConfiguredUserId === env.NOTE_USER_ID) return;
+
+  if (!hasSessionAuth()) {
+    if (!env.NOTE_EMAIL || !env.NOTE_PASSWORD || !(await loginToNote())) {
+      throw new Error("認証情報が必要です。.envファイルを確認してください。");
+    }
+  }
+
+  let response: any;
+  try {
+    response = await fetch(`${API_BASE_URL}/v2/current_user`, {
+      method: "GET",
+      headers: { ...DEFAULT_HEADERS, ...buildAuthHeaders() },
+    });
+  } catch {
+    throw new Error(
+      "current-userのユーザーIDを確認できません。セッションCookieを確認してください。"
+    );
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      "current-userのユーザーIDを確認できません。セッションCookieを確認してください。"
+    );
+  }
+
+  captureXsrfToken(response);
+  let responseData: any;
+  try {
+    responseData = await response.json();
+  } catch {
+    throw new Error(
+      "current-userのユーザーIDを確認できません。セッションCookieを確認してください。"
+    );
+  }
+
+  assertCurrentUserMatchesConfiguredUser(responseData, env.NOTE_USER_ID);
+  verifiedConfiguredUserId = env.NOTE_USER_ID;
 }
 
 // noteへのログイン処理を行う関数
@@ -89,7 +175,7 @@ export async function loginToNote(): Promise<boolean> {
         setActiveUserKey(responseData.data.key);
       }
       if (responseData && responseData.data && responseData.data.token) {
-        activeSessionCookie = `_note_session_v5=${responseData.data.token}`;
+        setActiveSessionCookie(`_note_session_v5=${responseData.data.token}`);
         console.error("Login successful. Session token obtained.");
       }
     } catch (e) {
@@ -103,7 +189,7 @@ export async function loginToNote(): Promise<boolean> {
       cookies.forEach((cookieStr) => {
         if (cookieStr.includes("_note_session_v5=")) {
           // セッションCookieを保存
-          activeSessionCookie = cookieStr.split(";")[0];
+          setActiveSessionCookie(cookieStr.split(";")[0]);
         } else if (cookieStr.includes("XSRF-TOKEN=")) {
           // XSRFトークンを保存（Cookieから）
           const tokenValue = cookieStr.split(";")[0].split("=")[1];

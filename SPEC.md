@@ -48,6 +48,8 @@ NOTE_XSRF_TOKEN=your_xsrf_token
 
 `NOTE_EMAIL` and `NOTE_PASSWORD` provide the optional direct-login path. Authentication is resolved lazily when an authenticated API call is made. Session cookies, XSRF tokens, passwords, and full response bodies stay out of logs and MCP responses.
 
+Before any authenticated list, read, create-draft, or edit-draft operation, the server resolves `current_user` and requires its `id` or `urlname` to match `NOTE_USER_ID`. If the identity is unavailable or mismatched, the operation fails closed with a redacted diagnostic. This check applies to session cookies, `NOTE_ALL_COOKIES`, and the optional email/password login path.
+
 ## Safety boundary
 
 The MVP writes only drafts. Publication, comments, likes, image uploads, analytics, search, memberships, Notion, Obsidian, HTTP/n8n, and browser automation are outside the default server surface.
