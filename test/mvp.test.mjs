@@ -9,6 +9,7 @@ import {
   buildEyecatchFormData,
   draftNoteKey,
   eyecatchMimeType,
+  assertEyecatchContents,
   isDraftNote,
   noteKeyFromPayload,
   assertEyecatchSize,
@@ -27,6 +28,7 @@ import {
   hasUnpublishedDraft,
   isLiveSmokeEnabled,
   isLiveDraftSmokeEnabled,
+  isLiveEyecatchSmokeEnabled,
 } from "../build/utils/live-smoke.js";
 import {
   assertCurrentUserMatchesConfiguredUser,
@@ -57,7 +59,7 @@ test("MVP exposes only note management tools", () => {
   ]);
 });
 
-test("Eyecatch uploads use the note API multipart contract", () => {
+test("Eyecatch uploads use the note API multipart contract", async () => {
   const form = buildEyecatchFormData("123", "cover.png", "image/png", Buffer.from("image"));
   assert.equal(form.get("note_id"), "123");
   assert.equal(form.get("width"), "1280");
@@ -65,16 +67,29 @@ test("Eyecatch uploads use the note API multipart contract", () => {
   const file = form.get("file");
   assert.equal(file.name, "cover.png");
   assert.equal(file.type, "image/png");
+  assert.equal(file.size, 5);
+  assert.deepEqual([...new Uint8Array(await file.arrayBuffer())], [...Buffer.from("image")]);
 });
 
 test("Eyecatch validation accepts supported formats and rejects unsafe sizes", () => {
   assert.equal(eyecatchMimeType("cover.PNG"), "image/png");
   assert.equal(eyecatchMimeType("cover.webp"), "image/webp");
   assert.throws(() => eyecatchMimeType("cover.svg"), /PNG.*JPEG.*GIF.*WebP/);
+  assert.doesNotThrow(() =>
+    assertEyecatchContents(
+      Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x62]),
+      "image/png"
+    )
+  );
+  assert.throws(
+    () => assertEyecatchContents(Buffer.from("not-an-image"), "image/png"),
+    /内容が拡張子と一致/
+  );
   assert.doesNotThrow(() => assertEyecatchSize(10 * 1024 * 1024));
   assert.throws(() => assertEyecatchSize(10 * 1024 * 1024 + 1), /10MB/);
   assert.equal(isDraftNote({ status: "draft" }), true);
   assert.equal(isDraftNote({ isDraft: true }), true);
+  assert.equal(isDraftNote({ noteDraft: {} }), true);
   assert.equal(isDraftNote({ status: "published" }), false);
   assert.equal(isDraftNote({}), false);
 });
@@ -135,6 +150,18 @@ test("Live smoke tests require both explicit opt-in flags", () => {
   );
   assert.equal(
     isLiveDraftSmokeEnabled({ NOTE_LIVE_TESTS: "true", NOTE_LIVE_DRAFT_TESTS: "false" }),
+    false
+  );
+  assert.equal(
+    isLiveEyecatchSmokeEnabled({
+      NOTE_LIVE_TESTS: "true",
+      NOTE_LIVE_DRAFT_TESTS: "true",
+      NOTE_LIVE_EYECATCH_TESTS: "true",
+    }),
+    true
+  );
+  assert.equal(
+    isLiveEyecatchSmokeEnabled({ NOTE_LIVE_TESTS: "true", NOTE_LIVE_EYECATCH_TESTS: "true" }),
     false
   );
 });

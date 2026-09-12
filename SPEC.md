@@ -85,7 +85,9 @@ draft, verifies it appears in the authenticated user's draft list after editing,
 and never publishes it. The smoke-test draft is retained for manual cleanup; only
 the explicitly identified draft created by that run may be deleted. When
 `NOTE_ALL_COOKIES` and `NOTE_LIVE_DRAFT_TESTS=true` are used, draft checks also require `NOTE_XSRF_TOKEN`.
-Credentials and full response bodies are not printed.
+When `NOTE_LIVE_EYECATCH_TESTS=true` is also set, the smoke check uploads the
+repository test image to that draft, reads the eyecatch back, and verifies that
+the draft remains unpublished. Credentials and full response bodies are not printed.
 
 ## Change policy
 

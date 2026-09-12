@@ -54,6 +54,24 @@ export function assertEyecatchSize(size: number): void {
   if (size > EYECATCH_MAX_BYTES) throw new Error("アイキャッチは10MB以下にしてください。");
 }
 
+function startsWithBytes(contents: Uint8Array, prefix: number[]): boolean {
+  return prefix.every((value, index) => contents[index] === value);
+}
+
+export function assertEyecatchContents(contents: Uint8Array, mimeType: string): void {
+  const valid =
+    (mimeType === "image/png" &&
+      startsWithBytes(contents, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) ||
+    (mimeType === "image/jpeg" && startsWithBytes(contents, [0xff, 0xd8, 0xff])) ||
+    (mimeType === "image/gif" &&
+      (startsWithBytes(contents, [0x47, 0x49, 0x46, 0x38, 0x37, 0x61]) ||
+        startsWithBytes(contents, [0x47, 0x49, 0x46, 0x38, 0x39, 0x61]))) ||
+    (mimeType === "image/webp" &&
+      startsWithBytes(contents, [0x52, 0x49, 0x46, 0x46]) &&
+      startsWithBytes(contents.subarray(8), [0x57, 0x45, 0x42, 0x50]));
+  if (!valid) throw new Error("アイキャッチの内容が拡張子と一致しません。");
+}
+
 export function buildEyecatchFormData(
   noteId: string,
   fileName: string,
@@ -61,12 +79,8 @@ export function buildEyecatchFormData(
   contents: Buffer
 ): FormData {
   const form = new FormData();
-  const fileBody = new Uint8Array(contents).buffer.slice(
-    contents.byteOffset,
-    contents.byteOffset + contents.byteLength
-  ) as ArrayBuffer;
   form.set("note_id", noteId);
-  form.set("file", new File([fileBody], fileName, { type: mimeType }));
+  form.set("file", new File([new Uint8Array(contents)], fileName, { type: mimeType }));
   form.set("width", String(EYECATCH_WIDTH));
   form.set("height", String(EYECATCH_HEIGHT));
   return form;
@@ -87,7 +101,7 @@ export function eyecatchUrlFromPayload(result: any): string | null {
 }
 
 export function isDraftNote(note: any): boolean {
-  return note?.status === "draft" || note?.isDraft === true;
+  return note?.status === "draft" || note?.isDraft === true || Boolean(note?.noteDraft || note?.note_draft);
 }
 
 let cachedNoteApiUserId: string | null = null;
@@ -140,8 +154,13 @@ async function getCreateDraftEndpoint(): Promise<string> {
 async function resolveNoteReference(
   noteId: string
 ): Promise<{ id: string; key?: string; isDraft: boolean }> {
+  const params = new URLSearchParams({
+    draft: "true",
+    draft_reedit: "false",
+    ts: String(Date.now()),
+  });
   const result = await noteApiRequest(
-    `/v3/notes/${encodeURIComponent(noteId)}`,
+    `/v3/notes/${encodeURIComponent(noteId)}?${params}`,
     "GET",
     null,
     true
@@ -219,7 +238,7 @@ export function registerMvpTools(server: McpServer): void {
             title: note.name || draft?.name || "(無題)",
             excerpt: body.replace(/<[^>]*>/g, "").slice(0, 100),
             status: note.status || "unknown",
-            isDraft: note.status === "draft" || Boolean(draft),
+            isDraft: isDraftNote(note),
             publishedAt: note.publishAt || note.publish_at || note.createdAt || "",
             url: `https://note.com/${encodeURIComponent(env.NOTE_USER_ID)}/n/${encodedKey}`,
             editUrl: `https://editor.note.com/notes/${encodedKey}/edit/`,
@@ -372,13 +391,18 @@ export function registerMvpTools(server: McpServer): void {
     },
     async ({ noteId, imagePath }) => {
       try {
-        const { id, key, isDraft } = await resolveNoteReference(noteId);
-        if (!isDraft) throw new Error("指定された記事が下書きではないため、アイキャッチ設定を中止しました。");
         const mimeType = eyecatchMimeType(imagePath);
         const fileStats = await stat(imagePath);
         if (!fileStats.isFile()) throw new Error("アイキャッチのパスがファイルではありません。");
         assertEyecatchSize(fileStats.size);
         const contents = await readFile(imagePath);
+        assertEyecatchSize(contents.byteLength);
+        assertEyecatchContents(contents, mimeType);
+        const { id, key, isDraft } = await resolveNoteReference(noteId);
+        if (!isDraft) throw new Error("指定された記事が下書きではないため、アイキャッチ設定を中止しました。");
+        if (!buildAuthHeaders()["X-XSRF-TOKEN"]) {
+          throw new Error("アイキャッチ設定にはXSRFトークンが必要です。認証情報を確認してください。");
+        }
         const form = buildEyecatchFormData(id, basename(imagePath), mimeType, contents);
         const result = await noteApiRequest(
           "/v1/image_upload/note_eyecatch",
