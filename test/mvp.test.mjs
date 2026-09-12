@@ -304,8 +304,8 @@ test("post-draft-note reads the created key from the draft list without retrying
     "owner"
   );
   const requests = [];
-  const request = async (endpoint, method) => {
-    requests.push({ endpoint, method });
+  const request = async (endpoint, method, body) => {
+    requests.push({ endpoint, method, body });
     if (endpoint.startsWith("/v2/creators/owner")) return { data: { id: "123" } };
     if (endpoint.startsWith("/v1/text_notes?")) return { data: { id: "179921781" } };
     if (endpoint.startsWith("/v1/text_notes/draft_save")) return {};
@@ -334,6 +334,13 @@ test("post-draft-note reads the created key from the draft list without retrying
     assert.equal(result.noteId, "179921781");
     assert.equal(result.noteKey, "n318f64f66b50");
     assert.equal(requests.filter(({ method }) => method === "POST").length, 2);
+    const draftSave = requests.find(({ endpoint }) => endpoint.startsWith("/v1/text_notes/draft_save"));
+    assert.match(draftSave.body.body, /^<p name="[^"]+" id="[^"]+">本文<\/p>$/);
+    assert.equal(draftSave.body.body.length, draftSave.body.body_length);
+    assert.equal(draftSave.body.name, "保存テスト");
+    assert.deepEqual(draftSave.body.tags, []);
+    assert.equal(draftSave.body.index, false);
+    assert.equal(draftSave.body.is_lead_form, false);
   } finally {
     env.NOTE_USER_ID = originalUserId;
     setActiveSessionCookie("");
