@@ -192,7 +192,20 @@ test("Authenticated current-user identity must match the configured user", () =>
         { data: { id: "owner", user: { id: "456", urlname: "other" } } },
         "owner"
       ),
-    /NOTE_USER_ID/
+    /NOTE_USER_ID|複数あり一致を確認できません/
+  );
+  assert.throws(
+    () =>
+      assertCurrentUserMatchesConfiguredUser(
+        {
+          data: {
+            user: { id: "123", urlname: "owner" },
+            current_user: { id: "456", urlname: "owner" },
+          },
+        },
+        "owner"
+      ),
+    /複数あり一致を確認できません/
   );
 });
 

@@ -59,16 +59,20 @@ function currentUserIdentity(currentUserResponse: any): {
   numericIdentifiers: string[];
   urlnameIdentifiers: string[];
 } {
-  const user = [
+  const users = [
     currentUserResponse?.data?.user,
     currentUserResponse?.data?.current_user,
     currentUserResponse?.user,
     currentUserResponse?.data,
-  ].find((candidate) => candidate && typeof candidate === "object");
-  const numericIdentifiers = [user?.id, user?.user_id, user?.userId]
+  ].filter((candidate) => candidate && typeof candidate === "object");
+  const numericIdentifiers = users
+    .flatMap((user) => [user.id, user.user_id, user.userId])
     .filter(Boolean)
     .map(String);
-  const urlnameIdentifiers = [user?.urlname].filter(Boolean).map(String);
+  const urlnameIdentifiers = users
+    .map((user) => user.urlname)
+    .filter(Boolean)
+    .map(String);
   return {
     identifiers: [...new Set([...numericIdentifiers, ...urlnameIdentifiers])],
     numericIdentifiers,
