@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { MVP_TOOL_NAMES } from "../build/tools/mvp-tools.js";
+import {
+  extractNotePayload,
+  normalizeNoteListResponse,
+  noteBelongsToUser,
+} from "../build/utils/note-normalizers.js";
 import { convertMarkdownToNoteHtml, looksLikeHtml } from "../build/utils/markdown-converter.js";
 import { createErrorResponse, handleApiError } from "../build/utils/error-handler.js";
 
@@ -41,4 +46,25 @@ test("Authentication secrets are redacted from errors and logs", () => {
   }
   assert.doesNotMatch(logged.join("\n"), /session-secret|xsrf-secret|owner@example.com|password-secret/);
   assert.match(createErrorResponse(secretMessage).content[0].text, /REDACTED/);
+});
+
+test("Note responses are normalized across authenticated API shapes", () => {
+  const response = {
+    data: {
+      notes: {
+        contents: [
+          { type: "note", note: { id: 12, name: "記事", key: "n-key" } },
+        ],
+        total_count: 4,
+      },
+    },
+  };
+
+  assert.deepEqual(normalizeNoteListResponse(response), {
+    notes: [{ id: 12, name: "記事", key: "n-key" }],
+    total: 4,
+  });
+  assert.deepEqual(extractNotePayload({ data: { note: { id: 12 } } }), { id: 12 });
+  assert.equal(noteBelongsToUser({ user: { urlname: "owner" } }, "owner"), true);
+  assert.equal(noteBelongsToUser({ user: { urlname: "other" } }, "owner"), false);
 });

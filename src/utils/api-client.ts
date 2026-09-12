@@ -2,7 +2,7 @@ import fetch from "node-fetch";
 import { API_BASE_URL, DEFAULT_HEADERS } from "../config/api-config.js";
 import { env } from "../config/environment.js";
 import { NoteApiResponse } from "../types/api-types.js";
-import { buildAuthHeaders, loginToNote, hasAuth } from "./auth.js";
+import { buildAuthHeaders, loginToNote, hasAuth, hasSessionAuth } from "./auth.js";
 
 // APIリクエスト用のヘルパー関数
 export async function noteApiRequest(
@@ -17,8 +17,11 @@ export async function noteApiRequest(
   };
 
   // 認証ヘッダーを追加。XSRFトークンだけでは認証済みとみなさない。
-  if (requireAuth && !hasAuth()) {
-    if (env.NOTE_EMAIL && env.NOTE_PASSWORD && (await loginToNote())) {
+  if (requireAuth && !hasSessionAuth()) {
+    if (env.NOTE_EMAIL && env.NOTE_PASSWORD) {
+      if (!(await loginToNote())) {
+        throw new Error("認証情報が必要です。.envファイルを確認してください。");
+      }
       Object.assign(headers, buildAuthHeaders());
     } else {
       throw new Error("認証情報が必要です。.envファイルを確認してください。");

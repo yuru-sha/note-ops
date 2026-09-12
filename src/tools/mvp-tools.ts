@@ -2,15 +2,19 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { env } from "../config/environment.js";
 import { noteApiRequest } from "../utils/api-client.js";
-import { buildAuthHeaders, hasAuth } from "../utils/auth.js";
+import { buildAuthHeaders } from "../utils/auth.js";
 import {
-  createAuthErrorResponse,
   createErrorResponse,
   createSuccessResponse,
   handleApiError,
 } from "../utils/error-handler.js";
 import { convertMarkdownToNoteHtml, looksLikeHtml } from "../utils/markdown-converter.js";
 import { formatNote } from "../utils/formatters.js";
+import {
+  extractNotePayload,
+  normalizeNoteListResponse,
+  noteBelongsToUser,
+} from "../utils/note-normalizers.js";
 
 export const MVP_TOOL_NAMES = [
   "get-my-notes",
@@ -43,7 +47,10 @@ async function getCreateDraftEndpoint(): Promise<string> {
 
   if (!cachedNoteApiUserId) {
     const result = await noteApiRequest(
-      `/v2/creators/${encodeURIComponent(env.NOTE_USER_ID)}`
+      `/v2/creators/${encodeURIComponent(env.NOTE_USER_ID)}`,
+      "GET",
+      null,
+      true
     );
     const payload = (result.data || result) as any;
     const numericId = payload.id || payload.user?.id;
@@ -55,14 +62,16 @@ async function getCreateDraftEndpoint(): Promise<string> {
 }
 
 async function resolveNumericNoteId(noteId: string): Promise<string> {
-  if (!noteId.startsWith("n")) return noteId;
   const result = await noteApiRequest(
     `/v3/notes/${encodeURIComponent(noteId)}`,
     "GET",
     null,
     true
   );
-  const payload = (result.data || result) as any;
+  const payload = extractNotePayload(result);
+  if (!noteBelongsToUser(payload, env.NOTE_USER_ID)) {
+    throw new Error("指定された記事は設定ユーザーの所有ではありません。");
+  }
   return String(payload.id || noteId);
 }
 
@@ -96,26 +105,25 @@ export function registerMvpTools(server: McpServer): void {
           null,
           true
         );
-        const data = result.data as any;
-        const notes = Array.isArray(data?.notes) ? data.notes : [];
+        const { notes, total } = normalizeNoteListResponse(result);
         const formatted = notes.map((note: any) => {
           const draft = note.noteDraft;
           const body = note.body || draft?.body || "";
           const key = note.key || "";
+          const encodedKey = encodeURIComponent(key || note.id || "");
           return {
             id: String(note.id || ""),
             key,
             title: note.name || draft?.name || "(無題)",
             excerpt: body.replace(/<[^>]*>/g, "").slice(0, 100),
             status: note.status || "unknown",
-            isDraft: note.status === "draft",
+            isDraft: note.status === "draft" || Boolean(draft),
             publishedAt: note.publishAt || note.publish_at || note.createdAt || "",
-            url: `https://note.com/${env.NOTE_USER_ID}/n/${key}`,
-            editUrl: `https://editor.note.com/notes/${key || note.id}/edit/`,
+            url: `https://note.com/${encodeURIComponent(env.NOTE_USER_ID)}/n/${encodedKey}`,
+            editUrl: `https://editor.note.com/notes/${encodedKey}/edit/`,
           };
         });
 
-        const total = data?.totalCount || formatted.length;
         return createSuccessResponse({
           total,
           page,
@@ -148,7 +156,10 @@ export function registerMvpTools(server: McpServer): void {
           null,
           true
         );
-        const note = (result.data || result) as any;
+        const note = extractNotePayload(result);
+        if (!noteBelongsToUser(note, env.NOTE_USER_ID)) {
+          throw new Error("指定された記事は設定ユーザーの所有ではありません。");
+        }
         return createSuccessResponse(
           formatNote(note, note.user?.urlname || env.NOTE_USER_ID, true, true)
         );
@@ -169,7 +180,6 @@ export function registerMvpTools(server: McpServer): void {
     },
     async ({ title, body, tags, id }) => {
       try {
-        if (!hasAuth()) return createAuthErrorResponse();
         const html = toNoteHtml(body);
 
         if (!id) {
@@ -180,10 +190,12 @@ export function registerMvpTools(server: McpServer): void {
             true,
             draftHeaders()
           );
-          const payload = (created.data || created) as any;
-          const note = payload.note || payload.text_note || payload.textNote || payload;
+          const payload = extractNotePayload(created);
+          const note = payload.note || payload;
           id = String(note.id || payload.note_id || payload.noteId || "");
           if (!id) throw new Error("下書きの作成に失敗しました。");
+        } else {
+          id = await resolveNumericNoteId(id);
         }
 
         const saved = await noteApiRequest(
@@ -200,12 +212,12 @@ export function registerMvpTools(server: McpServer): void {
           true,
           draftHeaders()
         );
-        const noteKey = `n${id}`;
+        const noteKey = id.startsWith("n") ? id : `n${id}`;
         return createSuccessResponse({
           success: true,
           noteId: id,
           noteKey,
-          editUrl: `https://editor.note.com/notes/${noteKey}/edit/`,
+          editUrl: `https://editor.note.com/notes/${encodeURIComponent(noteKey)}/edit/`,
           data: saved,
         });
       } catch (error) {
@@ -225,7 +237,6 @@ export function registerMvpTools(server: McpServer): void {
     },
     async ({ noteId, title, body, tags }) => {
       try {
-        if (!hasAuth()) return createAuthErrorResponse();
         const id = await resolveNumericNoteId(noteId);
         const html = toNoteHtml(body);
         const saved = await noteApiRequest(
