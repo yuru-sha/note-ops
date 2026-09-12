@@ -5,6 +5,7 @@ import {
   extractNotePayload,
   normalizeNoteListResponse,
   noteBelongsToUser,
+  noteOwnership,
 } from "../build/utils/note-normalizers.js";
 import { convertMarkdownToNoteHtml, looksLikeHtml } from "../build/utils/markdown-converter.js";
 import { createErrorResponse, handleApiError } from "../build/utils/error-handler.js";
@@ -68,6 +69,7 @@ test("Note responses are normalized across authenticated API shapes", () => {
   assert.deepEqual(extractNotePayload({ data: { note: { id: 12 } } }), { id: 12 });
   assert.equal(noteBelongsToUser({ user: { urlname: "owner" } }, "owner"), true);
   assert.equal(noteBelongsToUser({ user: { urlname: "other" } }, "owner"), false);
+  assert.equal(noteOwnership({ id: 12 }, "owner"), "unknown");
 });
 
 test("Draft fields and note-list queries match note.com response shapes", () => {

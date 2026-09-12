@@ -13,10 +13,14 @@ export function normalizeNoteListResponse(result: any): { notes: any[]; total: n
   return { notes, total: safeExtractTotal(response, notes.length) };
 }
 
-export function noteBelongsToUser(note: any, userId: string): boolean {
-  if (!userId) return false;
+export function noteOwnership(note: any, userId: string): boolean | "unknown" {
+  if (!userId) return "unknown";
   const user = note?.user || note?.author || {};
-  return [user.urlname, user.id, note?.user_id, note?.userId]
-    .filter(Boolean)
-    .some((value) => String(value) === userId);
+  const identifiers = [user.urlname, user.id, note?.user_id, note?.userId].filter(Boolean);
+  if (identifiers.length === 0) return "unknown";
+  return identifiers.some((value) => String(value) === userId);
+}
+
+export function noteBelongsToUser(note: any, userId: string): boolean {
+  return noteOwnership(note, userId) === true;
 }

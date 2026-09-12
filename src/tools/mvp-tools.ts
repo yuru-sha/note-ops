@@ -13,7 +13,7 @@ import { formatNote } from "../utils/formatters.js";
 import {
   extractNotePayload,
   normalizeNoteListResponse,
-  noteBelongsToUser,
+  noteOwnership,
 } from "../utils/note-normalizers.js";
 
 export const MVP_TOOL_NAMES = [
@@ -69,10 +69,16 @@ async function resolveNumericNoteId(noteId: string): Promise<string> {
     true
   );
   const payload = extractNotePayload(result);
-  if (!noteBelongsToUser(payload, env.NOTE_USER_ID)) {
-    throw new Error("指定された記事は設定ユーザーの所有ではありません。");
-  }
+  ensureNoteOwnership(payload);
   return String(payload.id || noteId);
+}
+
+function ensureNoteOwnership(note: any): void {
+  const ownership = noteOwnership(note, env.NOTE_USER_ID);
+  if (ownership === "unknown") {
+    throw new Error("記事の所有者情報を確認できないため、安全のため操作を中止しました。");
+  }
+  if (!ownership) throw new Error("指定された記事は設定ユーザーの所有ではありません。");
 }
 
 export function buildNoteListQuery(
@@ -166,9 +172,7 @@ export function registerMvpTools(server: McpServer): void {
           true
         );
         const note = extractNotePayload(result);
-        if (!noteBelongsToUser(note, env.NOTE_USER_ID)) {
-          throw new Error("指定された記事は設定ユーザーの所有ではありません。");
-        }
+        ensureNoteOwnership(note);
         return createSuccessResponse(
           formatNote(note, note.user?.urlname || env.NOTE_USER_ID, true, true)
         );
