@@ -211,6 +211,11 @@ test("Draft fields and note-list queries match note.com response shapes", () => 
   assert.equal(formatted.body, "<p>draft body</p>");
   assert.equal(formatted.hasDraftContent, true);
   assert.equal(formatted.lastUpdated, "2026-09-12");
+
+  const authorShaped = formatNote({ author: { id: "123", urlname: "owner" } });
+  assert.equal(authorShaped.author.id, "123");
+  assert.equal(authorShaped.author.urlname, "owner");
+
   assert.equal(buildNoteListQuery(2, 20, "all"), "limit=20&page=2");
   assert.equal(buildNoteListQuery(2, 20, "draft"), "limit=20&page=2&status=draft");
 });

@@ -21,7 +21,7 @@ export function formatNote(
   includeUserDetails?: boolean,
   analyzeContent?: boolean
 ): FormattedNote {
-  const user = note.user || {};
+  const user = note.user || note.author || {};
   const draft = note.noteDraft || note.note_draft;
 
   // コンテンツ分析用データの整形
