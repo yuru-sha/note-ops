@@ -51,25 +51,42 @@ export function assertCurrentUserMatchesConfiguredUser(
   currentUserResponse: any,
   configuredUserId: string
 ): void {
-  const candidates = [
+  const user = [
     currentUserResponse?.data?.user,
     currentUserResponse?.data?.current_user,
     currentUserResponse?.user,
     currentUserResponse?.data,
-  ];
-  const identifiers = candidates.flatMap((user) =>
-    [user?.id, user?.urlname, user?.user_id, user?.userId].filter(Boolean).map(String)
-  );
+  ].find((candidate) => candidate && typeof candidate === "object");
+  const numericIdentifiers = [user?.id, user?.user_id, user?.userId]
+    .filter(Boolean)
+    .map(String);
+  const urlnameIdentifiers = [user?.urlname].filter(Boolean).map(String);
+  const identifiers = [...new Set([...numericIdentifiers, ...urlnameIdentifiers])];
 
   if (identifiers.length === 0) {
     throw new Error(
       "current-userのユーザーIDを確認できません。セッションCookieとNOTE_USER_IDを確認してください。"
     );
   }
+  if (new Set(numericIdentifiers).size > 1 || new Set(urlnameIdentifiers).size > 1) {
+    throw new Error(
+      "current-userのユーザーIDが複数あり一致を確認できません。セッションCookieを確認してください。"
+    );
+  }
   if (!identifiers.includes(configuredUserId)) {
     throw new Error(
       "current-userのユーザーIDがNOTE_USER_IDと一致しません。NOTE_USER_IDまたはセッションCookieを確認してください。"
     );
+  }
+}
+
+export function extractXsrfTokenFromSetCookie(setCookieHeader: string): string | null {
+  const match = /(?:^|[;,]\s*)XSRF-TOKEN=([^;,\s]+)/.exec(setCookieHeader);
+  if (!match) return null;
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return match[1];
   }
 }
 
@@ -82,9 +99,7 @@ function captureXsrfToken(response: any): void {
 
   const setCookieHeader = response.headers.get("set-cookie");
   if (!setCookieHeader) return;
-  if (setCookieHeader.includes("XSRF-TOKEN=")) {
-    activeXsrfToken = decodeURIComponent(setCookieHeader.split(";")[0].split("=")[1]);
-  }
+  activeXsrfToken = extractXsrfTokenFromSetCookie(setCookieHeader);
 }
 
 export async function ensureAuthenticatedUser(): Promise<void> {
