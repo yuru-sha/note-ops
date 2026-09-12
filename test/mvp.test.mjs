@@ -3,7 +3,11 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
-import { MVP_TOOL_NAMES, buildNoteListQuery } from "../build/tools/mvp-tools.js";
+import {
+  MVP_TOOL_NAMES,
+  buildNoteListQuery,
+  draftNoteKey,
+} from "../build/tools/mvp-tools.js";
 import {
   extractNotePayload,
   normalizeNoteListResponse,
@@ -133,6 +137,11 @@ test("Markdown is converted without double-wrapping HTML", () => {
   );
   assert.match(richHtml, /<pre[^>]*><code[^>]*>const x = 1 &lt; 2;<\/code><\/pre>/);
   assert.match(richHtml, /<a href="https:\/\/example\.com"[^>]*>docs<\/a>/);
+});
+
+test("Draft responses preserve note.com keys", () => {
+  assert.equal(draftNoteKey("179921781", "n318f64f66b50"), "n318f64f66b50");
+  assert.equal(draftNoteKey("123"), "n123");
 });
 
 test("Authentication secrets are redacted from errors and logs", () => {
