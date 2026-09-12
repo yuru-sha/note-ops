@@ -121,6 +121,29 @@ function toNoteHtml(body: string): string {
   return looksLikeHtml(body) ? body : convertMarkdownToNoteHtml(body);
 }
 
+async function saveDraft(
+  id: string,
+  title: string,
+  html: string,
+  tags: string[] | undefined,
+  request: NoteApiRequest
+): Promise<void> {
+  await request(
+    `/v1/text_notes/draft_save?id=${encodeURIComponent(id)}&is_temp_saved=true`,
+    "POST",
+    {
+      body: html,
+      body_length: html.length,
+      name: title,
+      tags: tags || [],
+      index: false,
+      is_lead_form: false,
+    },
+    true,
+    draftHeaders()
+  );
+}
+
 export function draftNoteKey(id: string, key?: unknown): string {
   if (typeof key === "string" && key) return key;
   return id.startsWith("n") ? id : `n${id}`;
@@ -380,20 +403,7 @@ export function registerMvpTools(server: McpServer, request: NoteApiRequest = no
           createdNoteKey = resolved.key;
         }
 
-        await request(
-          `/v1/text_notes/draft_save?id=${encodeURIComponent(id)}&is_temp_saved=true`,
-          "POST",
-          {
-            body: html,
-            body_length: html.length,
-            name: title,
-            tags: tags || [],
-            index: false,
-            is_lead_form: false,
-          },
-          true,
-          draftHeaders()
-        );
+        await saveDraft(id, title, html, tags, request);
         const noteKey = createdNoteKey || (await resolveNoteKey(id, "draft", request));
         return createSuccessResponse({
           success: true,
@@ -420,20 +430,7 @@ export function registerMvpTools(server: McpServer, request: NoteApiRequest = no
       try {
         const { id } = await resolveNoteReference(noteId, request);
         const html = toNoteHtml(body);
-        await request(
-          `/v1/text_notes/draft_save?id=${encodeURIComponent(id)}&is_temp_saved=true`,
-          "POST",
-          {
-            body: html,
-            body_length: html.length,
-            name: title,
-            tags: tags || [],
-            index: false,
-            is_lead_form: false,
-          },
-          true,
-          draftHeaders()
-        );
+        await saveDraft(id, title, html, tags, request);
         return createSuccessResponse({ success: true, noteId });
       } catch (error) {
         return handleApiError(error, "記事編集");
