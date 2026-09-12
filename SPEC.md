@@ -54,6 +54,11 @@ Before any authenticated list, read, create-draft, or edit-draft operation, the 
 
 `get-note` and `edit-note` also require the target note to belong to `NOTE_USER_ID`; missing or mismatched ownership fails closed. Authentication and API errors are returned as actionable MCP errors without secrets or full response bodies.
 
+Ownership checks compare every identity field returned for the note with the
+identifiers verified from `current_user`; conflicting identity fields fail
+closed. Replacing an authenticated session clears the previously verified
+identity and XSRF token state.
+
 ## Safety boundary
 
 The MVP writes only drafts. Publication, comments, likes, image uploads, analytics, search, memberships, Notion, Obsidian, HTTP/n8n, and browser automation are outside the default server surface.

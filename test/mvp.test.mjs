@@ -27,7 +27,10 @@ import {
 import {
   assertCurrentUserMatchesConfiguredUser,
   extractXsrfTokenFromSetCookie,
+  getActiveXsrfToken,
   resolveXsrfToken,
+  setActiveSessionCookie,
+  setActiveXsrfToken,
 } from "../build/utils/auth.js";
 
 const repositoryRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -189,7 +192,20 @@ test("Authenticated current-user identity must match the configured user", () =>
         { data: { id: "owner", user: { id: "456", urlname: "other" } } },
         "owner"
       ),
-    /NOTE_USER_ID/
+    /NOTE_USER_ID|複数あり一致を確認できません/
+  );
+  assert.throws(
+    () =>
+      assertCurrentUserMatchesConfiguredUser(
+        {
+          data: {
+            user: { id: "123", urlname: "owner" },
+            current_user: { id: "456", urlname: "owner" },
+          },
+        },
+        "owner"
+      ),
+    /複数あり一致を確認できません/
   );
 });
 
@@ -205,6 +221,12 @@ test("XSRF tokens are extracted from the named cookie", () => {
     resolveXsrfToken("existing-xsrf", null, "_note_session_v5=session-secret; Path=/"),
     "existing-xsrf"
   );
+});
+
+test("Changing the active session discards the previous XSRF token", () => {
+  setActiveXsrfToken("old-xsrf");
+  setActiveSessionCookie("_note_session_v5=new-session");
+  assert.equal(getActiveXsrfToken(), null);
 });
 
 test("Note responses are normalized across authenticated API shapes", () => {
@@ -227,6 +249,26 @@ test("Note responses are normalized across authenticated API shapes", () => {
   assert.equal(noteBelongsToUser({ user: { urlname: "owner" } }, "owner"), true);
   assert.equal(noteBelongsToUser({ user: { urlname: "other" } }, "owner"), false);
   assert.equal(noteOwnership({ id: 12 }, "owner"), "unknown");
+});
+
+test("Note ownership rejects conflicting identity fields", () => {
+  const verifiedUserIdentifiers = ["123", "owner"];
+  assert.equal(
+    noteOwnership(
+      { user: { id: "123", urlname: "other" } },
+      "123",
+      verifiedUserIdentifiers
+    ),
+    false
+  );
+  assert.equal(
+    noteOwnership(
+      { user: { id: "123", urlname: "owner" } },
+      "owner",
+      verifiedUserIdentifiers
+    ),
+    true
+  );
 });
 
 test("Draft fields and note-list queries match note.com response shapes", () => {
