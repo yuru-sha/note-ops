@@ -97,6 +97,14 @@ async function main() {
   );
   if (!created.noteId) throw new Error("Draft creation returned no note ID.");
 
+  const draftDetailReference = created.noteKey || created.noteId;
+  const createdDetail = await step("draft detail verification", () =>
+    invoke(handlers, "get-note", { noteId: draftDetailReference })
+  );
+  if (String(createdDetail.id) !== String(created.noteId)) {
+    throw new Error("The created draft detail did not match the saved note ID.");
+  }
+
   await step("draft editing", () =>
     invoke(handlers, "edit-note", {
       noteId: created.noteKey || created.noteId,
@@ -132,7 +140,6 @@ async function main() {
   }
 
   const draftReference = created.noteId;
-  const draftDetailReference = created.noteKey || created.noteId;
   await step("eyecatch upload", () =>
     invoke(handlers, "set-note-eyecatch", {
       noteId: draftReference,

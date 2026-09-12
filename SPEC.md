@@ -30,8 +30,9 @@ The default server exposes exactly these tools:
 ## Tool rules
 
 - `get-my-notes` requires `NOTE_USER_ID` and supports `all`, `draft`, and `public` filters.
-- `get-note` accepts a note ID or key and includes draft content when note.com returns it.
+- `get-note` accepts a note ID or key and includes draft content when note.com returns it. Numeric IDs are resolved through the authenticated user's note list, and the detail endpoint is called with the returned note key.
 - `post-draft-note` accepts Markdown or HTML. Markdown is converted to note.com HTML; already-HTML input is preserved.
+- `post-draft-note` returns the note key from the create response or the authenticated draft list when note.com omits it; it does not fabricate a key from the numeric ID.
 - `edit-note` resolves note keys when necessary and always uses the draft-save path.
 - `set-note-eyecatch` accepts a local PNG, JPEG, GIF, or WebP file up to 10 MB, validates it before the request, and uses note.com's eyecatch upload endpoint with the configured article ownership checks.
 - `open-note-editor` requires `NOTE_USER_ID` and returns an editor URL.
@@ -54,7 +55,7 @@ Authenticated operations require `NOTE_USER_ID` and an authentication source: `N
 
 Before any authenticated list, read, create-draft, or edit-draft operation, the server resolves `current_user` and requires its `id` or `urlname` to match `NOTE_USER_ID`. If the identity is unavailable or mismatched, the operation fails closed with a redacted diagnostic. This check applies to session cookies, `NOTE_ALL_COOKIES`, and the optional email/password login path.
 
-`get-note`, `edit-note`, and `set-note-eyecatch` also require the target note to belong to `NOTE_USER_ID`; missing or mismatched ownership fails closed. Authentication and API errors are returned as actionable MCP errors without secrets or full response bodies.
+`get-note`, `edit-note`, and `set-note-eyecatch` also require the target note to belong to `NOTE_USER_ID`; missing or mismatched ownership fails closed. Numeric IDs that cannot be mapped to a note key return a clear diagnostic. Authentication and API errors are returned as actionable MCP errors without secrets or full response bodies.
 
 Ownership checks compare every identity field returned for the note with the
 identifiers verified from `current_user`; conflicting identity fields fail
@@ -85,6 +86,7 @@ draft, verifies it appears in the authenticated user's draft list after editing,
 and never publishes it. The smoke-test draft is retained for manual cleanup; only
 the explicitly identified draft created by that run may be deleted. When
 `NOTE_ALL_COOKIES` and `NOTE_LIVE_DRAFT_TESTS=true` are used, draft checks also require `NOTE_XSRF_TOKEN`.
+The draft smoke also reads the newly saved draft by its returned note key.
 When `NOTE_LIVE_EYECATCH_TESTS=true` is also set, the smoke check uploads the
 repository test image to that draft, reads the eyecatch back, and verifies that
 the draft remains unpublished. Credentials and full response bodies are not printed.
