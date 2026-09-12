@@ -27,6 +27,8 @@ import {
 
 const repositoryRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const agentInstructions = readFileSync(join(repositoryRoot, "AGENTS.md"), "utf8");
+const readme = readFileSync(join(repositoryRoot, "README.md"), "utf8");
+const spec = readFileSync(join(repositoryRoot, "SPEC.md"), "utf8");
 const workflowSkill = readFileSync(
   join(repositoryRoot, "skills/note-management-workflow/SKILL.md"),
   "utf8"
@@ -71,6 +73,21 @@ test("note workflow skill documents the safe five-tool contract", () => {
 test("note workflow skill is discoverable from project instructions", () => {
   assert.match(agentInstructions, /skills\/note-management-workflow\/SKILL\.md/);
   assert.match(agentInstructions, /before using the MCP workflow/i);
+});
+
+test("documentation states authentication and ownership boundaries", () => {
+  for (const documentation of [readme, spec]) {
+    assert.match(
+      documentation,
+      /(?:NOTE_USER_ID.*(?:認証情報|authentication source)|(?:認証対象|authenticated operations).*NOTE_USER_ID)/i
+    );
+    assert.match(documentation, /NOTE_ALL_COOKIES.*NOTE_XSRF_TOKEN/i);
+    assert.match(documentation, /get-note.*(?:所有|ownership)/i);
+    assert.match(documentation, /失敗|fails? closed/i);
+  }
+  assert.match(readme, /セッション応答のXSRFトークン/);
+  assert.match(readme, /NOTE_ALL_COOKIES.*live draft smoke.*NOTE_XSRF_TOKEN/i);
+  assert.match(spec, /draft write requests include an XSRF token.*when available/i);
 });
 
 test("Live smoke tests require both explicit opt-in flags", () => {

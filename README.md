@@ -14,9 +14,9 @@ npm run build
 npm start
 ```
 
-`.env` に `NOTE_USER_ID` と、既存セッションの `NOTE_SESSION_V5`／`NOTE_XSRF_TOKEN` を設定してください。メールアドレスとパスワードによる直接ログインも任意で利用できます。認証値はコミットせず、ログやMCPレスポンスに出力しないでください。
+認証対象の一覧取得・詳細取得・下書き作成・下書き編集には、`NOTE_USER_ID` と、既存セッション（`NOTE_SESSION_V5`。下書き操作では `NOTE_XSRF_TOKEN` またはセッション応答のXSRFトークンを使用）、`NOTE_ALL_COOKIES`、または `NOTE_EMAIL` と `NOTE_PASSWORD` の直接ログインを設定します。認証値はコミットせず、ログやMCPレスポンスに出力しないでください。
 
-認証済みの一覧取得・読み取り・下書き作成・下書き編集では、note.com の `current_user` と `NOTE_USER_ID` が一致することを事前に確認します。一致しない、またはユーザーIDを取得できないセッションでは処理を中止します。`NOTE_ALL_COOKIES` と直接ログインも同じ確認対象です。
+認証対象の操作では、note.com の `current_user` と `NOTE_USER_ID` が一致することを事前に確認します。`get-note` と `edit-note` では記事の所有者も確認します。一致しない、所有者を確認できない、または認証に失敗した場合は処理を中止し、秘密情報を含まないエラーを返します。`open-note-editor` はURL生成だけを行い、`NOTE_USER_ID` の設定のみを確認します。
 
 ## MCPツール
 
@@ -63,6 +63,6 @@ npm test
 npm run test:live
 ```
 
-read smoke は `current_user` の一致と記事詳細の設定ユーザー所有を確認します。下書きの作成・編集まで確認する場合だけ `NOTE_LIVE_DRAFT_TESTS=true` も設定してください。`NOTE_ALL_COOKIES` を使う場合は `NOTE_XSRF_TOKEN` も必要です。実行時刻を含む `[note-ops live smoke ...]` のタイトルで識別できる下書きを作成・編集し、認証済みの下書き一覧への再取得で未公開状態を確認したうえで残します。作成した下書きは自動削除せず、cleanupする場合はその実行で作成した下書きだけを明示的に対象にしてください。live smoke は資格情報や full response body を出力しません。失敗時は操作名と確認事項だけを redacted して表示します。
+read smoke は `current_user` の一致と記事詳細の設定ユーザー所有を確認します。下書きの作成・編集まで確認する場合だけ `NOTE_LIVE_DRAFT_TESTS=true` も設定してください。`NOTE_ALL_COOKIES` と `NOTE_LIVE_DRAFT_TESTS=true` で live draft smoke を実行する場合は事前チェックのため `NOTE_XSRF_TOKEN` も設定してください。実行時刻を含む `[note-ops live smoke ...]` のタイトルで識別できる下書きを作成・編集し、認証済みの下書き一覧への再取得で未公開状態を確認したうえで残します。作成した下書きは自動削除せず、cleanupする場合はその実行で作成した下書きだけを明示的に対象にしてください。live smoke は資格情報や full response body を出力しません。失敗時は操作名と確認事項だけを redacted して表示します。
 
 仕様の詳細は [SPEC.md](SPEC.md) を参照してください。note.comの非公開API仕様変更により動作しなくなる可能性があります。
