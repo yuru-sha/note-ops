@@ -11,6 +11,11 @@ import { convertMarkdownToNoteHtml, looksLikeHtml } from "../build/utils/markdow
 import { createErrorResponse, handleApiError } from "../build/utils/error-handler.js";
 import { formatNote } from "../build/utils/formatters.js";
 import { isLiveSmokeEnabled, isLiveDraftSmokeEnabled } from "../build/utils/live-smoke.js";
+import {
+  assertCurrentUserMatchesConfiguredUser,
+  extractXsrfTokenFromSetCookie,
+  resolveXsrfToken,
+} from "../build/utils/auth.js";
 
 test("MVP exposes only note management tools", () => {
   assert.deepEqual([...MVP_TOOL_NAMES], [
@@ -62,6 +67,49 @@ test("Authentication secrets are redacted from errors and logs", () => {
   }
   assert.doesNotMatch(logged.join("\n"), /session-secret|xsrf-secret|owner@example.com|password-secret/);
   assert.match(createErrorResponse(secretMessage).content[0].text, /REDACTED/);
+});
+
+test("Authenticated current-user identity must match the configured user", () => {
+  assert.doesNotThrow(() =>
+    assertCurrentUserMatchesConfiguredUser(
+      { data: { user: { id: "123", urlname: "owner" } } },
+      "owner"
+    )
+  );
+  assert.throws(
+    () =>
+      assertCurrentUserMatchesConfiguredUser(
+        { data: { user: { id: "456", urlname: "other" } } },
+        "owner"
+      ),
+    /NOTE_USER_ID/
+  );
+  assert.throws(
+    () => assertCurrentUserMatchesConfiguredUser({ data: {} }, "owner"),
+    /current-user/
+  );
+  assert.throws(
+    () =>
+      assertCurrentUserMatchesConfiguredUser(
+        { data: { id: "owner", user: { id: "456", urlname: "other" } } },
+        "owner"
+      ),
+    /NOTE_USER_ID/
+  );
+});
+
+test("XSRF tokens are extracted from the named cookie", () => {
+  assert.equal(
+    extractXsrfTokenFromSetCookie(
+      "_note_session_v5=session-secret; Path=/, XSRF-TOKEN=xsrf%2Dsecret; Path=/"
+    ),
+    "xsrf-secret"
+  );
+  assert.equal(extractXsrfTokenFromSetCookie("_note_session_v5=session-secret; Path=/"), null);
+  assert.equal(
+    resolveXsrfToken("existing-xsrf", null, "_note_session_v5=session-secret; Path=/"),
+    "existing-xsrf"
+  );
 });
 
 test("Note responses are normalized across authenticated API shapes", () => {
