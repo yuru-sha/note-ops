@@ -14,6 +14,7 @@ import { isLiveSmokeEnabled, isLiveDraftSmokeEnabled } from "../build/utils/live
 import {
   assertCurrentUserMatchesConfiguredUser,
   extractXsrfTokenFromSetCookie,
+  resolveXsrfToken,
 } from "../build/utils/auth.js";
 
 test("MVP exposes only note management tools", () => {
@@ -105,6 +106,10 @@ test("XSRF tokens are extracted from the named cookie", () => {
     "xsrf-secret"
   );
   assert.equal(extractXsrfTokenFromSetCookie("_note_session_v5=session-secret; Path=/"), null);
+  assert.equal(
+    resolveXsrfToken("existing-xsrf", null, "_note_session_v5=session-secret; Path=/"),
+    "existing-xsrf"
+  );
 });
 
 test("Note responses are normalized across authenticated API shapes", () => {

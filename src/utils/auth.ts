@@ -90,16 +90,29 @@ export function extractXsrfTokenFromSetCookie(setCookieHeader: string): string |
   }
 }
 
-function captureXsrfToken(response: any): void {
-  const responseXsrfToken = response.headers.get("x-xsrf-token");
+export function resolveXsrfToken(
+  currentToken: string | null,
+  responseXsrfToken: string | null,
+  setCookieHeader: string | null
+): string | null {
   if (responseXsrfToken) {
-    activeXsrfToken = decodeURIComponent(responseXsrfToken);
-    return;
+    try {
+      return decodeURIComponent(responseXsrfToken);
+    } catch {
+      return responseXsrfToken;
+    }
   }
+  return setCookieHeader
+    ? extractXsrfTokenFromSetCookie(setCookieHeader) || currentToken
+    : currentToken;
+}
 
-  const setCookieHeader = response.headers.get("set-cookie");
-  if (!setCookieHeader) return;
-  activeXsrfToken = extractXsrfTokenFromSetCookie(setCookieHeader);
+function captureXsrfToken(response: any): void {
+  activeXsrfToken = resolveXsrfToken(
+    activeXsrfToken,
+    response.headers.get("x-xsrf-token"),
+    response.headers.get("set-cookie")
+  );
 }
 
 export async function ensureAuthenticatedUser(): Promise<void> {
