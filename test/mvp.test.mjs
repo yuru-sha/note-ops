@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import test from "node:test";
 import {
   MVP_TOOL_NAMES,
+  registerMvpTools,
   buildNoteListQuery,
   buildEyecatchFormData,
   draftNoteKey,
@@ -12,8 +13,12 @@ import {
   assertEyecatchContents,
   isDraftNote,
   noteKeyFromPayload,
+  noteKeyFromCreateResponse,
+  buildNoteDetailEndpoint,
+  noteKeyForId,
   assertEyecatchSize,
 } from "../build/tools/mvp-tools.js";
+import { env } from "../build/config/environment.js";
 import {
   extractNotePayload,
   normalizeNoteListResponse,
@@ -38,6 +43,19 @@ import {
   setActiveSessionCookie,
   setActiveXsrfToken,
 } from "../build/utils/auth.js";
+
+function registerHandlers(request) {
+  const handlers = new Map();
+  registerMvpTools(
+    {
+      tool(name, _description, _schema, handler) {
+        handlers.set(name, handler);
+      },
+    },
+    request
+  );
+  return handlers;
+}
 
 const repositoryRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const agentInstructions = readFileSync(join(repositoryRoot, "AGENTS.md"), "utf8");
@@ -203,6 +221,122 @@ test("Draft responses preserve note.com keys", () => {
   assert.equal(draftNoteKey("123"), "n123");
   for (const alias of ["key", "note_key", "noteKey"]) {
     assert.equal(noteKeyFromPayload({ [alias]: "n318f64f66b50" }), "n318f64f66b50");
+  }
+});
+
+test("Numeric note IDs resolve to keys from the authenticated list fixture", () => {
+  const { notes } = normalizeNoteListResponse({
+    data: {
+      contents: [
+        {
+          type: "note",
+          note: {
+            id: 179921781,
+            key: "n318f64f66b50",
+            noteDraft: { name: "保存済み下書き" },
+          },
+        },
+      ],
+      total_count: 1,
+    },
+  });
+
+  assert.equal(noteKeyForId(notes, "179921781"), "n318f64f66b50");
+  assert.equal(noteKeyForId(notes, "404"), undefined);
+});
+
+test("Draft create responses and detail reads use the note key contract", () => {
+  assert.equal(
+    noteKeyFromCreateResponse({ data: { text_note: { id: 179921781, key: "n318f64f66b50" } } }),
+    "n318f64f66b50"
+  );
+  assert.equal(
+    buildNoteDetailEndpoint("n318f64f66b50", 123),
+    "/v3/notes/n318f64f66b50?draft=true&draft_reedit=false&ts=123"
+  );
+  assert.match(buildNoteDetailEndpoint("n/key", 123), /%2F/);
+});
+
+test("get-note resolves a numeric ID before the detail request", async () => {
+  const originalUserId = env.NOTE_USER_ID;
+  env.NOTE_USER_ID = "owner";
+  assertCurrentUserMatchesConfiguredUser(
+    { data: { user: { id: "123", urlname: "owner" } } },
+    "owner"
+  );
+  const requests = [];
+  const request = async (endpoint, method) => {
+    requests.push({ endpoint, method });
+    if (endpoint.startsWith("/v2/note_list/contents")) {
+      return {
+        data: {
+          contents: [
+            { type: "note", note: { id: 179921781, key: "n318f64f66b50", user: { id: "123", urlname: "owner" } } },
+          ],
+          total_count: 1,
+        },
+      };
+    }
+    if (endpoint.startsWith("/v3/notes/n318f64f66b50")) {
+      return { data: { note: { id: 179921781, key: "n318f64f66b50", name: "記事", user: { id: "123", urlname: "owner" } } } };
+    }
+    throw new Error(`unexpected endpoint: ${endpoint}`);
+  };
+
+  try {
+    const response = await registerHandlers(request).get("get-note")({ noteId: "179921781" });
+    assert.equal(response.isError, undefined);
+    assert.equal(JSON.parse(response.content[0].text).id, 179921781);
+    assert.equal(requests.filter(({ method }) => method === "GET").length, 2);
+    assert.ok(requests.some(({ endpoint }) => endpoint.startsWith("/v3/notes/n318f64f66b50")));
+    assert.ok(!requests.some(({ endpoint }) => endpoint.startsWith("/v3/notes/179921781")));
+  } finally {
+    env.NOTE_USER_ID = originalUserId;
+    setActiveSessionCookie("");
+  }
+});
+
+test("post-draft-note reads the created key from the draft list without retrying writes", async () => {
+  const originalUserId = env.NOTE_USER_ID;
+  env.NOTE_USER_ID = "owner";
+  assertCurrentUserMatchesConfiguredUser(
+    { data: { user: { id: "123", urlname: "owner" } } },
+    "owner"
+  );
+  const requests = [];
+  const request = async (endpoint, method) => {
+    requests.push({ endpoint, method });
+    if (endpoint.startsWith("/v2/creators/owner")) return { data: { id: "123" } };
+    if (endpoint.startsWith("/v1/text_notes?")) return { data: { id: "179921781" } };
+    if (endpoint.startsWith("/v1/text_notes/draft_save")) return {};
+    if (endpoint.startsWith("/v2/note_list/contents")) {
+      return {
+        data: {
+          notes: {
+            contents: [
+              { type: "note", note: { id: 179921781, key: "n318f64f66b50", user: { id: "123", urlname: "owner" } } },
+            ],
+            total_count: 1,
+          },
+        },
+      };
+    }
+    throw new Error(`unexpected endpoint: ${endpoint}`);
+  };
+
+  try {
+    const response = await registerHandlers(request).get("post-draft-note")({
+      title: "保存テスト",
+      body: "本文",
+    });
+    const result = JSON.parse(response.content[0].text);
+    assert.equal(response.isError, undefined);
+    assert.equal(result.noteId, "179921781");
+    assert.equal(result.noteKey, "n318f64f66b50");
+    assert.equal(requests.filter(({ method }) => method === "POST").length, 2);
+  } finally {
+    env.NOTE_USER_ID = originalUserId;
+    setActiveSessionCookie("");
   }
 });
 

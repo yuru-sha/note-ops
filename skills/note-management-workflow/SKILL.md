@@ -23,7 +23,9 @@ Do not invent missing source material, title requirements, or tags.
 1. Prepare a candidate title, body, and tags from the supplied source. Keep the
    full body in working context only; return a short summary until the user
    asks to see the body.
-2. Inspect the target when needed with `get-my-notes` and `get-note`. Use
+2. Inspect the target when needed with `get-my-notes` and `get-note`. Prefer the
+   returned note key for detail reads; numeric IDs are resolved through the
+   authenticated user's list before `get-note` calls the detail endpoint. Use
    `open-note-editor` when an editor link is useful. These reads do not change
    note.com state.
 3. Show the proposed action, target, title, tags, and a short body summary.
@@ -55,6 +57,8 @@ Use no other MCP tools or note.com endpoints for this workflow.
 - On an authentication, ownership, validation, or API error, stop the
   workflow, identify the failed operation, and pass through only the server's
   redacted actionable message. Do not retry a draft write automatically.
+- If a numeric ID cannot be mapped to a note key, stop and report the redacted
+  diagnostic; do not guess a key from the numeric ID.
 - Keep credentials, cookies, tokens, and full article bodies out of logs and
   routine status output.
 - This workflow does not publish, comment, like, upload body images, or analyze

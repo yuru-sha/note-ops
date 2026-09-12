@@ -105,6 +105,7 @@ export function isDraftNote(note: any): boolean {
 }
 
 let cachedNoteApiUserId: string | null = null;
+type NoteApiRequest = typeof noteApiRequest;
 
 function draftHeaders(): Record<string, string> {
   return {
@@ -130,13 +131,49 @@ export function noteKeyFromPayload(note: any): string | undefined {
   return typeof key === "string" && key ? key : undefined;
 }
 
-async function getCreateDraftEndpoint(): Promise<string> {
+export function noteKeyFromCreateResponse(result: any): string | undefined {
+  const payload = extractNotePayload(result);
+  const note = payload?.note || payload;
+  return noteKeyFromPayload(note) || noteKeyFromPayload(payload);
+}
+
+function noteWithId(notes: readonly any[], noteId: string): any | undefined {
+  return notes.find((candidate: any) =>
+    [candidate?.id, candidate?.note_id, candidate?.noteId].some(
+      (value) => String(value ?? "") === noteId
+    )
+  );
+}
+
+export function noteKeyForId(notes: readonly any[], noteId: string): string | undefined {
+  const note = noteWithId(notes, noteId);
+  const draft = note?.noteDraft || note?.note_draft;
+  return noteKeyFromPayload(note) || noteKeyFromPayload(draft);
+}
+
+function detailLookupError(error: unknown): unknown {
+  if (error instanceof Error && error.message.includes("API error: 400")) {
+    return new Error("記事詳細の識別子が受け付けられませんでした。note keyを確認してください。");
+  }
+  return error;
+}
+
+export function buildNoteDetailEndpoint(noteReference: string, timestamp: number): string {
+  const params = new URLSearchParams({
+    draft: "true",
+    draft_reedit: "false",
+    ts: String(timestamp),
+  });
+  return `/v3/notes/${encodeURIComponent(noteReference)}?${params}`;
+}
+
+async function getCreateDraftEndpoint(request: NoteApiRequest): Promise<string> {
   if (!env.NOTE_USER_ID) {
     throw new Error("新規下書きの作成にはNOTE_USER_IDが必要です。.envを確認してください。");
   }
 
   if (!cachedNoteApiUserId) {
-    const result = await noteApiRequest(
+    const result = await request(
       `/v2/creators/${encodeURIComponent(env.NOTE_USER_ID)}`,
       "GET",
       null,
@@ -151,43 +188,50 @@ async function getCreateDraftEndpoint(): Promise<string> {
   return `/v1/text_notes?user_id=${encodeURIComponent(cachedNoteApiUserId)}`;
 }
 
-async function resolveDraftNoteKey(noteId: string): Promise<string> {
+async function resolveNoteKey(
+  noteId: string,
+  status: "all" | "draft",
+  request: NoteApiRequest
+): Promise<string> {
   let page = 1;
   while (true) {
-    const { notes, total } = await fetchNoteListPage(page, 100, "draft");
-    const note = notes.find((candidate: any) =>
-      [candidate?.id, candidate?.note_id, candidate?.noteId].some(
-        (value) => String(value ?? "") === noteId
-      )
-    );
+    const { notes, total } = await fetchNoteListPage(page, 100, status, request);
+    const note = noteWithId(notes, noteId);
     if (note) {
       ensureNoteOwnership(note);
-      const draft = note.noteDraft || note.note_draft;
-      const key = noteKeyFromPayload(note) || noteKeyFromPayload(draft);
+      const key = noteKeyForId(notes, noteId);
       if (key) return key;
       throw new Error("数値IDに対応する記事キーを確認できませんでした。");
     }
     if (notes.length === 0 || page * 100 >= total) break;
     page += 1;
   }
-  throw new Error("指定された下書きが設定ユーザーの一覧に見つかりませんでした。");
+  throw new Error("指定された記事のnote keyを設定ユーザーの一覧から確認できませんでした。");
+}
+
+async function fetchNoteDetail(noteReference: string, request: NoteApiRequest): Promise<any> {
+  try {
+    return await request(
+      buildNoteDetailEndpoint(noteReference, Date.now()),
+      "GET",
+      null,
+      true
+    );
+  } catch (error) {
+    throw detailLookupError(error);
+  }
+}
+
+async function resolveDetailReference(noteId: string, request: NoteApiRequest): Promise<string> {
+  return /^\d+$/.test(noteId) ? resolveNoteKey(noteId, "all", request) : noteId;
 }
 
 async function resolveNoteReference(
-  noteId: string
+  noteId: string,
+  request: NoteApiRequest
 ): Promise<{ id: string; key?: string; isDraft: boolean }> {
-  const noteReference = /^\d+$/.test(noteId) ? await resolveDraftNoteKey(noteId) : noteId;
-  const params = new URLSearchParams({
-    draft: "true",
-    draft_reedit: "false",
-    ts: String(Date.now()),
-  });
-  const result = await noteApiRequest(
-    `/v3/notes/${encodeURIComponent(noteReference)}?${params}`,
-    "GET",
-    null,
-    true
-  );
+  const noteReference = await resolveDetailReference(noteId, request);
+  const result = await fetchNoteDetail(noteReference, request);
   const payload = extractNotePayload(result);
   ensureNoteOwnership(payload);
   const key = noteKeyFromPayload(payload);
@@ -223,9 +267,10 @@ export function buildNoteListQuery(
 async function fetchNoteListPage(
   page: number,
   limit: number,
-  status: "all" | "draft" | "public"
+  status: "all" | "draft" | "public",
+  request: NoteApiRequest = noteApiRequest
 ): Promise<{ notes: any[]; total: number }> {
-  const result = await noteApiRequest(
+  const result = await request(
     `/v2/note_list/contents?${buildNoteListQuery(page, limit, status)}`,
     "GET",
     null,
@@ -234,7 +279,7 @@ async function fetchNoteListPage(
   return normalizeNoteListResponse(result);
 }
 
-export function registerMvpTools(server: McpServer): void {
+export function registerMvpTools(server: McpServer, request: NoteApiRequest = noteApiRequest): void {
   server.tool(
     "get-my-notes",
     "自分の記事と下書きの一覧を取得する",
@@ -249,7 +294,7 @@ export function registerMvpTools(server: McpServer): void {
           return createErrorResponse("環境変数 NOTE_USER_ID が設定されていません。");
         }
 
-        const { notes, total } = await fetchNoteListPage(page, perPage, status);
+        const { notes, total } = await fetchNoteListPage(page, perPage, status, request);
         const formatted = notes.map((note: any) => {
           const draft = note.noteDraft || note.note_draft;
           const body = note.body || draft?.body || "";
@@ -289,17 +334,8 @@ export function registerMvpTools(server: McpServer): void {
     { noteId: z.string().min(1).describe("記事IDまたは記事キー") },
     async ({ noteId }) => {
       try {
-        const params = new URLSearchParams({
-          draft: "true",
-          draft_reedit: "false",
-          ts: String(Date.now()),
-        });
-        const result = await noteApiRequest(
-          `/v3/notes/${encodeURIComponent(noteId)}?${params}`,
-          "GET",
-          null,
-          true
-        );
+        const noteReference = await resolveDetailReference(noteId, request);
+        const result = await fetchNoteDetail(noteReference, request);
         const note = extractNotePayload(result);
         ensureNoteOwnership(note);
         return createSuccessResponse(
@@ -326,8 +362,8 @@ export function registerMvpTools(server: McpServer): void {
         let createdNoteKey: string | undefined;
 
         if (!id) {
-          const created = await noteApiRequest(
-            await getCreateDraftEndpoint(),
+          const created = await request(
+            await getCreateDraftEndpoint(request),
             "POST",
             { body: "<p></p>", body_length: 0, name: title, index: false, is_lead_form: false },
             true,
@@ -336,15 +372,15 @@ export function registerMvpTools(server: McpServer): void {
           const payload = extractNotePayload(created);
           const note = payload.note || payload;
           id = String(note.id || payload.note_id || payload.noteId || "");
-          createdNoteKey = noteKeyFromPayload(note) || noteKeyFromPayload(payload);
+          createdNoteKey = noteKeyFromCreateResponse(created);
           if (!id) throw new Error("下書きの作成に失敗しました。");
         } else {
-          const resolved = await resolveNoteReference(id);
+          const resolved = await resolveNoteReference(id, request);
           id = resolved.id;
           createdNoteKey = resolved.key;
         }
 
-        await noteApiRequest(
+        await request(
           `/v1/text_notes/draft_save?id=${encodeURIComponent(id)}&is_temp_saved=true`,
           "POST",
           {
@@ -358,7 +394,7 @@ export function registerMvpTools(server: McpServer): void {
           true,
           draftHeaders()
         );
-        const noteKey = draftNoteKey(id, createdNoteKey);
+        const noteKey = createdNoteKey || (await resolveNoteKey(id, "draft", request));
         return createSuccessResponse({
           success: true,
           noteId: id,
@@ -382,9 +418,9 @@ export function registerMvpTools(server: McpServer): void {
     },
     async ({ noteId, title, body, tags }) => {
       try {
-        const { id } = await resolveNoteReference(noteId);
+        const { id } = await resolveNoteReference(noteId, request);
         const html = toNoteHtml(body);
-        await noteApiRequest(
+        await request(
           `/v1/text_notes/draft_save?id=${encodeURIComponent(id)}&is_temp_saved=true`,
           "POST",
           {
@@ -421,13 +457,13 @@ export function registerMvpTools(server: McpServer): void {
         const contents = await readFile(imagePath);
         assertEyecatchSize(contents.byteLength);
         assertEyecatchContents(contents, mimeType);
-        const { id, key, isDraft } = await resolveNoteReference(noteId);
+        const { id, key, isDraft } = await resolveNoteReference(noteId, request);
         if (!isDraft) throw new Error("指定された記事が下書きではないため、アイキャッチ設定を中止しました。");
         if (!buildAuthHeaders()["X-XSRF-TOKEN"]) {
           throw new Error("アイキャッチ設定にはXSRFトークンが必要です。認証情報を確認してください。");
         }
         const form = buildEyecatchFormData(id, basename(imagePath), mimeType, contents);
-        const result = await noteApiRequest(
+        const result = await request(
           "/v1/image_upload/note_eyecatch",
           "POST",
           form,
