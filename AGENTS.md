@@ -26,6 +26,10 @@ Read `SPEC.md` before changing code. Treat it as the authoritative contract for 
 - Keep public behavior backward compatible within the five-tool MVP contract.
 - Update `SPEC.md` when tool behavior, authentication, transport, or safety boundaries change.
 
+## Project skills
+
+- For note.com article workflow requests (draft, inspect, revise, or save), read `skills/note-management-workflow/SKILL.md` before using the MCP workflow.
+
 ## Git
 
 The agent may edit and verify the working tree. Commits, branches, pushes, and pull requests require an explicit user request.
