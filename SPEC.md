@@ -67,10 +67,14 @@ It must build the TypeScript entry point and pass the offline tests for the MVP 
 An opt-in authenticated smoke check is available as `npm run test:live` when
 `NOTE_LIVE_TESTS=true`, `NOTE_USER_ID`, `NOTE_LIVE_NOTE_ID`, and the documented
 note.com credentials are configured. It checks article-list and article-detail
-reads without creating an article. Draft creation/editing requires
+reads, including the authenticated identity and configured-user ownership
+checks, without creating an article. Draft creation/editing requires
 the additional `NOTE_LIVE_DRAFT_TESTS=true` flag, uses an identifiable smoke-test
-draft, and never publishes it. When `NOTE_ALL_COOKIES` is used, draft checks also
-require `NOTE_XSRF_TOKEN`. Credentials and full response bodies are not printed.
+draft, verifies it appears in the authenticated user's draft list after editing,
+and never publishes it. The smoke-test draft is retained for manual cleanup; only
+the explicitly identified draft created by that run may be deleted. When
+`NOTE_ALL_COOKIES` is used, draft checks also require `NOTE_XSRF_TOKEN`.
+Credentials and full response bodies are not printed.
 
 ## Change policy
 

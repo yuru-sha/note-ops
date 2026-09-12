@@ -13,7 +13,12 @@ import {
 import { convertMarkdownToNoteHtml, looksLikeHtml } from "../build/utils/markdown-converter.js";
 import { createErrorResponse, handleApiError } from "../build/utils/error-handler.js";
 import { formatNote } from "../build/utils/formatters.js";
-import { isLiveSmokeEnabled, isLiveDraftSmokeEnabled } from "../build/utils/live-smoke.js";
+import {
+  hasConfiguredUserOwnership,
+  hasUnpublishedDraft,
+  isLiveSmokeEnabled,
+  isLiveDraftSmokeEnabled,
+} from "../build/utils/live-smoke.js";
 import {
   assertCurrentUserMatchesConfiguredUser,
   extractXsrfTokenFromSetCookie,
@@ -79,6 +84,25 @@ test("Live smoke tests require both explicit opt-in flags", () => {
     isLiveDraftSmokeEnabled({ NOTE_LIVE_TESTS: "true", NOTE_LIVE_DRAFT_TESTS: "false" }),
     false
   );
+});
+
+test("Live draft verification requires the created note in the draft list", () => {
+  assert.equal(
+    hasUnpublishedDraft(
+      [{ id: "123", isDraft: true }, { id: "456", isDraft: false }],
+      "123"
+    ),
+    true
+  );
+  assert.equal(hasUnpublishedDraft([{ id: "123", isDraft: false }], "123"), false);
+  assert.equal(hasUnpublishedDraft([{ id: "456", isDraft: true }], "123"), false);
+});
+
+test("Live article verification requires the configured user as author", () => {
+  assert.equal(hasConfiguredUserOwnership({ author: { urlname: "owner" } }, "owner"), true);
+  assert.equal(hasConfiguredUserOwnership({ author: { id: "123" } }, "123"), true);
+  assert.equal(hasConfiguredUserOwnership({ author: { urlname: "other" } }, "owner"), false);
+  assert.equal(hasConfiguredUserOwnership({}, "owner"), false);
 });
 
 test("Markdown is converted without double-wrapping HTML", () => {
