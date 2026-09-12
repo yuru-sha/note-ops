@@ -60,7 +60,7 @@ async function main() {
 
   const handlers = registerHandlers();
   const list = await step("article list", () =>
-    invoke(handlers, "get-my-notes", { page: 1, perPage: 20, status: "public" })
+    invoke(handlers, "get-my-notes", { page: 1, perPage: 20, status: "all" })
   );
   if (!Array.isArray(list.notes)) {
     throw new Error("The article list response did not contain a notes array.");
