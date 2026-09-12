@@ -62,6 +62,14 @@ npm test
 
 It must build the TypeScript entry point and pass the offline tests for the MVP tool list and Markdown conversion. Live note.com API checks require user-provided credentials and are separate from this gate.
 
+An opt-in authenticated smoke check is available as `npm run test:live` when
+`NOTE_LIVE_TESTS=true`, `NOTE_USER_ID`, `NOTE_LIVE_NOTE_ID`, and the documented
+note.com credentials are configured. It checks article-list and article-detail
+reads without creating an article. Draft creation/editing requires
+the additional `NOTE_LIVE_DRAFT_TESTS=true` flag, uses an identifiable smoke-test
+draft, and never publishes it. When `NOTE_ALL_COOKIES` is used, draft checks also
+require `NOTE_XSRF_TOKEN`. Credentials and full response bodies are not printed.
+
 ## Change policy
 
 Changes that expand the default tool surface must update this specification and its offline registration check together.

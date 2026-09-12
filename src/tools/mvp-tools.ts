@@ -211,7 +211,7 @@ export function registerMvpTools(server: McpServer): void {
           id = await resolveNumericNoteId(id);
         }
 
-        const saved = await noteApiRequest(
+        await noteApiRequest(
           `/v1/text_notes/draft_save?id=${encodeURIComponent(id)}&is_temp_saved=true`,
           "POST",
           {
@@ -231,7 +231,6 @@ export function registerMvpTools(server: McpServer): void {
           noteId: id,
           noteKey,
           editUrl: `https://editor.note.com/notes/${encodeURIComponent(noteKey)}/edit/`,
-          data: saved,
         });
       } catch (error) {
         return handleApiError(error, "記事下書き保存");
@@ -252,7 +251,7 @@ export function registerMvpTools(server: McpServer): void {
       try {
         const id = await resolveNumericNoteId(noteId);
         const html = toNoteHtml(body);
-        const saved = await noteApiRequest(
+        await noteApiRequest(
           `/v1/text_notes/draft_save?id=${encodeURIComponent(id)}&is_temp_saved=true`,
           "POST",
           {
@@ -266,7 +265,7 @@ export function registerMvpTools(server: McpServer): void {
           true,
           draftHeaders()
         );
-        return createSuccessResponse({ success: true, noteId, data: saved });
+        return createSuccessResponse({ success: true, noteId });
       } catch (error) {
         return handleApiError(error, "記事編集");
       }

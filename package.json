@@ -9,6 +9,7 @@
     "start": "node build/index.js",
     "dev": "npm run build && npm run start",
     "test": "npm run build && node --test test/*.test.mjs",
+    "test:live": "npm run build && node test/live-smoke.mjs",
     "dev:watch": "tsc --watch"
   },
   "dependencies": {
