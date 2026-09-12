@@ -1,3 +1,6 @@
+import { readFile, stat } from "node:fs/promises";
+import { basename, extname } from "node:path";
+import { File, FormData } from "node-fetch";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { env } from "../config/environment.js";
@@ -24,8 +27,68 @@ export const MVP_TOOL_NAMES = [
   "get-note",
   "post-draft-note",
   "edit-note",
+  "set-note-eyecatch",
   "open-note-editor",
 ] as const;
+
+const EYECATCH_MAX_BYTES = 10 * 1024 * 1024;
+const EYECATCH_WIDTH = 1280;
+const EYECATCH_HEIGHT = 670;
+const EYECATCH_MIME_TYPES: Record<string, string> = {
+  ".gif": "image/gif",
+  ".jpeg": "image/jpeg",
+  ".jpg": "image/jpeg",
+  ".png": "image/png",
+  ".webp": "image/webp",
+};
+
+export function eyecatchMimeType(filePath: string): string {
+  const mimeType = EYECATCH_MIME_TYPES[extname(filePath).toLowerCase()];
+  if (!mimeType) {
+    throw new Error("アイキャッチはPNG、JPEG、GIF、WebP形式に対応しています。");
+  }
+  return mimeType;
+}
+
+export function assertEyecatchSize(size: number): void {
+  if (size > EYECATCH_MAX_BYTES) throw new Error("アイキャッチは10MB以下にしてください。");
+}
+
+export function buildEyecatchFormData(
+  noteId: string,
+  fileName: string,
+  mimeType: string,
+  contents: Buffer
+): FormData {
+  const form = new FormData();
+  const fileBody = new Uint8Array(contents).buffer.slice(
+    contents.byteOffset,
+    contents.byteOffset + contents.byteLength
+  ) as ArrayBuffer;
+  form.set("note_id", noteId);
+  form.set("file", new File([fileBody], fileName, { type: mimeType }));
+  form.set("width", String(EYECATCH_WIDTH));
+  form.set("height", String(EYECATCH_HEIGHT));
+  return form;
+}
+
+export function eyecatchUrlFromPayload(result: any): string | null {
+  const candidates = [
+    result?.url,
+    result?.image_url,
+    result?.eyecatch,
+    result?.data?.url,
+    result?.data?.image_url,
+    result?.data?.eyecatch,
+    result?.data?.image?.url,
+    result?.data?.data?.url,
+  ];
+  return candidates.find((value) => typeof value === "string" && value) || null;
+}
+
+export function isDraftNote(note: any): boolean {
+  return note?.status === "draft" || note?.isDraft === true;
+}
 
 let cachedNoteApiUserId: string | null = null;
 
@@ -74,7 +137,9 @@ async function getCreateDraftEndpoint(): Promise<string> {
   return `/v1/text_notes?user_id=${encodeURIComponent(cachedNoteApiUserId)}`;
 }
 
-async function resolveNoteReference(noteId: string): Promise<{ id: string; key?: string }> {
+async function resolveNoteReference(
+  noteId: string
+): Promise<{ id: string; key?: string; isDraft: boolean }> {
   const result = await noteApiRequest(
     `/v3/notes/${encodeURIComponent(noteId)}`,
     "GET",
@@ -87,6 +152,7 @@ async function resolveNoteReference(noteId: string): Promise<{ id: string; key?:
   return {
     id: String(payload.id || noteId),
     key: key || (noteId.startsWith("n") ? noteId : undefined),
+    isDraft: isDraftNote(payload),
   };
 }
 
@@ -293,6 +359,46 @@ export function registerMvpTools(server: McpServer): void {
         return createSuccessResponse({ success: true, noteId });
       } catch (error) {
         return handleApiError(error, "記事編集");
+      }
+    }
+  );
+
+  server.tool(
+    "set-note-eyecatch",
+    "自分の下書きにローカル画像をアイキャッチとして設定する（公開しない）",
+    {
+      noteId: z.string().min(1).describe("記事IDまたは記事キー"),
+      imagePath: z.string().min(1).describe("アップロードするローカル画像のパス"),
+    },
+    async ({ noteId, imagePath }) => {
+      try {
+        const { id, key, isDraft } = await resolveNoteReference(noteId);
+        if (!isDraft) throw new Error("指定された記事が下書きではないため、アイキャッチ設定を中止しました。");
+        const mimeType = eyecatchMimeType(imagePath);
+        const fileStats = await stat(imagePath);
+        if (!fileStats.isFile()) throw new Error("アイキャッチのパスがファイルではありません。");
+        assertEyecatchSize(fileStats.size);
+        const contents = await readFile(imagePath);
+        const form = buildEyecatchFormData(id, basename(imagePath), mimeType, contents);
+        const result = await noteApiRequest(
+          "/v1/image_upload/note_eyecatch",
+          "POST",
+          form,
+          true,
+          {
+            origin: "https://editor.note.com",
+            referer: "https://editor.note.com/",
+            "x-requested-with": "XMLHttpRequest",
+          }
+        );
+        return createSuccessResponse({
+          success: true,
+          noteId: id,
+          noteKey: key || draftNoteKey(id),
+          eyecatchUrl: eyecatchUrlFromPayload(result),
+        });
+      } catch (error) {
+        return handleApiError(error, "アイキャッチ設定");
       }
     }
   );

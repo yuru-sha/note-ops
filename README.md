@@ -26,9 +26,10 @@ npm start
 | `get-note` | 記事・下書き詳細 | 読み取り |
 | `post-draft-note` | 新規下書き作成・更新 | 下書き保存 |
 | `edit-note` | 既存記事を下書き保存 | 下書き保存 |
+| `set-note-eyecatch` | ローカル画像を記事のタイトル画像に設定 | アイキャッチ更新 |
 | `open-note-editor` | 編集URL生成 | 読み取り |
 
-公開、コメント、スキ、画像アップロード、検索、Notion、Obsidian、HTTP/n8n、ブラウザ自動化はMVPの対象外です。公開操作はnote.comから行ってください。
+公開、コメント、スキ、本文画像のアップロード、検索、Notion、Obsidian、HTTP/n8n、ブラウザ自動化はMVPの対象外です。公開操作はnote.comから行ってください。タイトル画像は、認証済みの自分の記事に対して、PNG/JPEG/GIF/WebPのローカルファイル（10MB以下）だけを設定できます。
 
 ## MCPクライアント設定例
 
