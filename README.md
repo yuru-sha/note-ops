@@ -26,9 +26,10 @@ npm start
 | `get-note` | 記事・下書き詳細 | 読み取り |
 | `post-draft-note` | 新規下書き作成・更新 | 下書き保存 |
 | `edit-note` | 既存記事を下書き保存 | 下書き保存 |
+| `set-note-eyecatch` | ローカル画像を記事のタイトル画像に設定 | アイキャッチ更新 |
 | `open-note-editor` | 編集URL生成 | 読み取り |
 
-公開、コメント、スキ、画像アップロード、検索、Notion、Obsidian、HTTP/n8n、ブラウザ自動化はMVPの対象外です。公開操作はnote.comから行ってください。
+公開、コメント、スキ、本文画像のアップロード、検索、Notion、Obsidian、HTTP/n8n、ブラウザ自動化はMVPの対象外です。公開操作はnote.comから行ってください。タイトル画像は、認証済みの自分の記事に対して、PNG/JPEG/GIF/WebPのローカルファイル（10MB以下）だけを設定できます。
 
 ## MCPクライアント設定例
 
@@ -63,6 +64,6 @@ npm test
 npm run test:live
 ```
 
-read smoke は `current_user` の一致と記事詳細の設定ユーザー所有を確認します。下書きの作成・編集まで確認する場合だけ `NOTE_LIVE_DRAFT_TESTS=true` も設定してください。`NOTE_ALL_COOKIES` と `NOTE_LIVE_DRAFT_TESTS=true` で live draft smoke を実行する場合は事前チェックのため `NOTE_XSRF_TOKEN` も設定してください。実行時刻を含む `[note-ops live smoke ...]` のタイトルで識別できる下書きを作成・編集し、認証済みの下書き一覧への再取得で未公開状態を確認したうえで残します。作成した下書きは自動削除せず、cleanupする場合はその実行で作成した下書きだけを明示的に対象にしてください。live smoke は資格情報や full response body を出力しません。失敗時は操作名と確認事項だけを redacted して表示します。
+read smoke は `current_user` の一致と記事詳細の設定ユーザー所有を確認します。下書きの作成・編集まで確認する場合だけ `NOTE_LIVE_DRAFT_TESTS=true` も設定してください。下書きへのアイキャッチ設定と読み戻しまで確認する場合は、さらに `NOTE_LIVE_EYECATCH_TESTS=true` を設定してください。`NOTE_ALL_COOKIES` と `NOTE_LIVE_DRAFT_TESTS=true` で live draft smoke を実行する場合は事前チェックのため `NOTE_XSRF_TOKEN` も設定してください。実行時刻を含む `[note-ops live smoke ...]` のタイトルで識別できる下書きを作成・編集し、認証済みの下書き一覧への再取得で未公開状態を確認したうえで残します。アイキャッチ smoke はリポジトリ内のテスト画像を設定し、詳細取得と下書き一覧で確認します。作成した下書きは自動削除せず、cleanupする場合はその実行で作成した下書きだけを明示的に対象にしてください。live smoke は資格情報や full response body を出力しません。失敗時は操作名と確認事項だけを redacted して表示します。
 
 仕様の詳細は [SPEC.md](SPEC.md) を参照してください。note.comの非公開API仕様変更により動作しなくなる可能性があります。

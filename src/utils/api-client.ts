@@ -1,4 +1,4 @@
-import fetch from "node-fetch";
+import fetch, { FormData } from "node-fetch";
 import { API_BASE_URL, DEFAULT_HEADERS } from "../config/api-config.js";
 import { env } from "../config/environment.js";
 import { NoteApiResponse } from "../types/api-types.js";
@@ -15,6 +15,8 @@ export async function noteApiRequest(
   const headers: { [key: string]: string } = {
     ...DEFAULT_HEADERS,
   };
+
+  if (body instanceof FormData) delete headers["Content-Type"];
 
   // 認証済みAPIは current-user と設定ユーザーの一致を確認してから実行する。
   if (requireAuth) {
@@ -42,7 +44,7 @@ export async function noteApiRequest(
 
   if (body && (method === "POST" || method === "PUT")) {
     // Bufferの場合はそのまま送信、それ以外はJSON化
-    if (Buffer.isBuffer(body)) {
+    if (body instanceof FormData || Buffer.isBuffer(body)) {
       options.body = body;
     } else {
       options.body = JSON.stringify(body);

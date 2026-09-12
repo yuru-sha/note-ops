@@ -1,3 +1,6 @@
+import { readFile, stat } from "node:fs/promises";
+import { basename, extname } from "node:path";
+import { File, FormData } from "node-fetch";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { env } from "../config/environment.js";
@@ -24,8 +27,82 @@ export const MVP_TOOL_NAMES = [
   "get-note",
   "post-draft-note",
   "edit-note",
+  "set-note-eyecatch",
   "open-note-editor",
 ] as const;
+
+const EYECATCH_MAX_BYTES = 10 * 1024 * 1024;
+const EYECATCH_WIDTH = 1280;
+const EYECATCH_HEIGHT = 670;
+const EYECATCH_MIME_TYPES: Record<string, string> = {
+  ".gif": "image/gif",
+  ".jpeg": "image/jpeg",
+  ".jpg": "image/jpeg",
+  ".png": "image/png",
+  ".webp": "image/webp",
+};
+
+export function eyecatchMimeType(filePath: string): string {
+  const mimeType = EYECATCH_MIME_TYPES[extname(filePath).toLowerCase()];
+  if (!mimeType) {
+    throw new Error("アイキャッチはPNG、JPEG、GIF、WebP形式に対応しています。");
+  }
+  return mimeType;
+}
+
+export function assertEyecatchSize(size: number): void {
+  if (size > EYECATCH_MAX_BYTES) throw new Error("アイキャッチは10MB以下にしてください。");
+}
+
+function startsWithBytes(contents: Uint8Array, prefix: number[]): boolean {
+  return prefix.every((value, index) => contents[index] === value);
+}
+
+export function assertEyecatchContents(contents: Uint8Array, mimeType: string): void {
+  const valid =
+    (mimeType === "image/png" &&
+      startsWithBytes(contents, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) ||
+    (mimeType === "image/jpeg" && startsWithBytes(contents, [0xff, 0xd8, 0xff])) ||
+    (mimeType === "image/gif" &&
+      (startsWithBytes(contents, [0x47, 0x49, 0x46, 0x38, 0x37, 0x61]) ||
+        startsWithBytes(contents, [0x47, 0x49, 0x46, 0x38, 0x39, 0x61]))) ||
+    (mimeType === "image/webp" &&
+      startsWithBytes(contents, [0x52, 0x49, 0x46, 0x46]) &&
+      startsWithBytes(contents.subarray(8), [0x57, 0x45, 0x42, 0x50]));
+  if (!valid) throw new Error("アイキャッチの内容が拡張子と一致しません。");
+}
+
+export function buildEyecatchFormData(
+  noteId: string,
+  fileName: string,
+  mimeType: string,
+  contents: Buffer
+): FormData {
+  const form = new FormData();
+  form.set("note_id", noteId);
+  form.set("file", new File([new Uint8Array(contents)], fileName, { type: mimeType }));
+  form.set("width", String(EYECATCH_WIDTH));
+  form.set("height", String(EYECATCH_HEIGHT));
+  return form;
+}
+
+export function eyecatchUrlFromPayload(result: any): string | null {
+  const candidates = [
+    result?.url,
+    result?.image_url,
+    result?.eyecatch,
+    result?.data?.url,
+    result?.data?.image_url,
+    result?.data?.eyecatch,
+    result?.data?.image?.url,
+    result?.data?.data?.url,
+  ];
+  return candidates.find((value) => typeof value === "string" && value) || null;
+}
+
+export function isDraftNote(note: any): boolean {
+  return note?.status === "draft" || note?.isDraft === true || Boolean(note?.noteDraft || note?.note_draft);
+}
 
 let cachedNoteApiUserId: string | null = null;
 
@@ -74,9 +151,39 @@ async function getCreateDraftEndpoint(): Promise<string> {
   return `/v1/text_notes?user_id=${encodeURIComponent(cachedNoteApiUserId)}`;
 }
 
-async function resolveNoteReference(noteId: string): Promise<{ id: string; key?: string }> {
+async function resolveDraftNoteKey(noteId: string): Promise<string> {
+  let page = 1;
+  while (true) {
+    const { notes, total } = await fetchNoteListPage(page, 100, "draft");
+    const note = notes.find((candidate: any) =>
+      [candidate?.id, candidate?.note_id, candidate?.noteId].some(
+        (value) => String(value ?? "") === noteId
+      )
+    );
+    if (note) {
+      ensureNoteOwnership(note);
+      const draft = note.noteDraft || note.note_draft;
+      const key = noteKeyFromPayload(note) || noteKeyFromPayload(draft);
+      if (key) return key;
+      throw new Error("数値IDに対応する記事キーを確認できませんでした。");
+    }
+    if (notes.length === 0 || page * 100 >= total) break;
+    page += 1;
+  }
+  throw new Error("指定された下書きが設定ユーザーの一覧に見つかりませんでした。");
+}
+
+async function resolveNoteReference(
+  noteId: string
+): Promise<{ id: string; key?: string; isDraft: boolean }> {
+  const noteReference = /^\d+$/.test(noteId) ? await resolveDraftNoteKey(noteId) : noteId;
+  const params = new URLSearchParams({
+    draft: "true",
+    draft_reedit: "false",
+    ts: String(Date.now()),
+  });
   const result = await noteApiRequest(
-    `/v3/notes/${encodeURIComponent(noteId)}`,
+    `/v3/notes/${encodeURIComponent(noteReference)}?${params}`,
     "GET",
     null,
     true
@@ -86,7 +193,8 @@ async function resolveNoteReference(noteId: string): Promise<{ id: string; key?:
   const key = noteKeyFromPayload(payload);
   return {
     id: String(payload.id || noteId),
-    key: key || (noteId.startsWith("n") ? noteId : undefined),
+    key: key || (noteReference.startsWith("n") ? noteReference : undefined),
+    isDraft: isDraftNote(payload),
   };
 }
 
@@ -153,7 +261,7 @@ export function registerMvpTools(server: McpServer): void {
             title: note.name || draft?.name || "(無題)",
             excerpt: body.replace(/<[^>]*>/g, "").slice(0, 100),
             status: note.status || "unknown",
-            isDraft: note.status === "draft" || Boolean(draft),
+            isDraft: isDraftNote(note),
             publishedAt: note.publishAt || note.publish_at || note.createdAt || "",
             url: `https://note.com/${encodeURIComponent(env.NOTE_USER_ID)}/n/${encodedKey}`,
             editUrl: `https://editor.note.com/notes/${encodedKey}/edit/`,
@@ -293,6 +401,51 @@ export function registerMvpTools(server: McpServer): void {
         return createSuccessResponse({ success: true, noteId });
       } catch (error) {
         return handleApiError(error, "記事編集");
+      }
+    }
+  );
+
+  server.tool(
+    "set-note-eyecatch",
+    "自分の下書きにローカル画像をアイキャッチとして設定する（公開しない）",
+    {
+      noteId: z.string().min(1).describe("記事IDまたは記事キー"),
+      imagePath: z.string().min(1).describe("アップロードするローカル画像のパス"),
+    },
+    async ({ noteId, imagePath }) => {
+      try {
+        const mimeType = eyecatchMimeType(imagePath);
+        const fileStats = await stat(imagePath);
+        if (!fileStats.isFile()) throw new Error("アイキャッチのパスがファイルではありません。");
+        assertEyecatchSize(fileStats.size);
+        const contents = await readFile(imagePath);
+        assertEyecatchSize(contents.byteLength);
+        assertEyecatchContents(contents, mimeType);
+        const { id, key, isDraft } = await resolveNoteReference(noteId);
+        if (!isDraft) throw new Error("指定された記事が下書きではないため、アイキャッチ設定を中止しました。");
+        if (!buildAuthHeaders()["X-XSRF-TOKEN"]) {
+          throw new Error("アイキャッチ設定にはXSRFトークンが必要です。認証情報を確認してください。");
+        }
+        const form = buildEyecatchFormData(id, basename(imagePath), mimeType, contents);
+        const result = await noteApiRequest(
+          "/v1/image_upload/note_eyecatch",
+          "POST",
+          form,
+          true,
+          {
+            origin: "https://editor.note.com",
+            referer: "https://editor.note.com/",
+            "x-requested-with": "XMLHttpRequest",
+          }
+        );
+        return createSuccessResponse({
+          success: true,
+          noteId: id,
+          noteKey: key || draftNoteKey(id),
+          eyecatchUrl: eyecatchUrlFromPayload(result),
+        });
+      } catch (error) {
+        return handleApiError(error, "アイキャッチ設定");
       }
     }
   );

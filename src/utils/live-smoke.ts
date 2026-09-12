@@ -1,6 +1,7 @@
 type LiveSmokeEnvironment = {
   NOTE_LIVE_TESTS?: string;
   NOTE_LIVE_DRAFT_TESTS?: string;
+  NOTE_LIVE_EYECATCH_TESTS?: string;
 };
 
 export function isLiveSmokeEnabled(environment: LiveSmokeEnvironment): boolean {
@@ -9,6 +10,10 @@ export function isLiveSmokeEnabled(environment: LiveSmokeEnvironment): boolean {
 
 export function isLiveDraftSmokeEnabled(environment: LiveSmokeEnvironment): boolean {
   return isLiveSmokeEnabled(environment) && environment.NOTE_LIVE_DRAFT_TESTS === "true";
+}
+
+export function isLiveEyecatchSmokeEnabled(environment: LiveSmokeEnvironment): boolean {
+  return isLiveDraftSmokeEnabled(environment) && environment.NOTE_LIVE_EYECATCH_TESTS === "true";
 }
 
 export function hasConfiguredUserOwnership(note: unknown, userId: string): boolean {

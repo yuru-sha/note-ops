@@ -24,6 +24,7 @@ The default server exposes exactly these tools:
 | `get-note` | Read an article or draft by ID/key | No |
 | `post-draft-note` | Create or save a draft | Draft save |
 | `edit-note` | Save an existing article as a draft | Draft save |
+| `set-note-eyecatch` | Upload a local image and set it as the article eyecatch | Draft metadata update |
 | `open-note-editor` | Build the note editor URL | No |
 
 ## Tool rules
@@ -32,6 +33,7 @@ The default server exposes exactly these tools:
 - `get-note` accepts a note ID or key and includes draft content when note.com returns it.
 - `post-draft-note` accepts Markdown or HTML. Markdown is converted to note.com HTML; already-HTML input is preserved.
 - `edit-note` resolves note keys when necessary and always uses the draft-save path.
+- `set-note-eyecatch` accepts a local PNG, JPEG, GIF, or WebP file up to 10 MB, validates it before the request, and uses note.com's eyecatch upload endpoint with the configured article ownership checks.
 - `open-note-editor` requires `NOTE_USER_ID` and returns an editor URL.
 - Note IDs and keys are URL-encoded before API or URL construction.
 - API errors are returned as MCP error responses with actionable, non-secret messages.
@@ -48,11 +50,11 @@ NOTE_XSRF_TOKEN=your_xsrf_token
 
 `NOTE_EMAIL` and `NOTE_PASSWORD` provide the optional direct-login path. Authentication is resolved lazily when an authenticated API call is made. Session cookies, XSRF tokens, passwords, and full response bodies stay out of logs and MCP responses.
 
-Authenticated operations require `NOTE_USER_ID` and an authentication source: `NOTE_SESSION_V5`, `NOTE_ALL_COOKIES`, or `NOTE_EMAIL` plus `NOTE_PASSWORD`. Draft write requests include an XSRF token from `NOTE_XSRF_TOKEN` or the authenticated session response when available. The note.com API may reject a draft write without it. When `NOTE_ALL_COOKIES` and `NOTE_LIVE_DRAFT_TESTS=true` are used, the live draft smoke preflight requires `NOTE_XSRF_TOKEN`. `open-note-editor` only builds a URL and requires `NOTE_USER_ID`; it does not make an authenticated API call.
+Authenticated operations require `NOTE_USER_ID` and an authentication source: `NOTE_SESSION_V5`, `NOTE_ALL_COOKIES`, or `NOTE_EMAIL` plus `NOTE_PASSWORD`. Draft and eyecatch writes include an XSRF token from `NOTE_XSRF_TOKEN` or the authenticated session response when available. The note.com API may reject a write without it. When `NOTE_ALL_COOKIES` and `NOTE_LIVE_DRAFT_TESTS=true` are used, the live draft smoke preflight requires `NOTE_XSRF_TOKEN`. `open-note-editor` only builds a URL and requires `NOTE_USER_ID`; it does not make an authenticated API call.
 
 Before any authenticated list, read, create-draft, or edit-draft operation, the server resolves `current_user` and requires its `id` or `urlname` to match `NOTE_USER_ID`. If the identity is unavailable or mismatched, the operation fails closed with a redacted diagnostic. This check applies to session cookies, `NOTE_ALL_COOKIES`, and the optional email/password login path.
 
-`get-note` and `edit-note` also require the target note to belong to `NOTE_USER_ID`; missing or mismatched ownership fails closed. Authentication and API errors are returned as actionable MCP errors without secrets or full response bodies.
+`get-note`, `edit-note`, and `set-note-eyecatch` also require the target note to belong to `NOTE_USER_ID`; missing or mismatched ownership fails closed. Authentication and API errors are returned as actionable MCP errors without secrets or full response bodies.
 
 Ownership checks compare every identity field returned for the note with the
 identifiers verified from `current_user`; conflicting identity fields fail
@@ -61,7 +63,7 @@ identity and XSRF token state.
 
 ## Safety boundary
 
-The MVP writes only drafts. Publication, comments, likes, image uploads, analytics, search, memberships, Notion, Obsidian, HTTP/n8n, and browser automation are outside the default server surface.
+The MVP writes only drafts and draft eyecatch metadata. Publication, comments, likes, body-image uploads, analytics, search, memberships, Notion, Obsidian, HTTP/n8n, and browser automation are outside the default server surface.
 
 ## Verification
 
@@ -83,7 +85,9 @@ draft, verifies it appears in the authenticated user's draft list after editing,
 and never publishes it. The smoke-test draft is retained for manual cleanup; only
 the explicitly identified draft created by that run may be deleted. When
 `NOTE_ALL_COOKIES` and `NOTE_LIVE_DRAFT_TESTS=true` are used, draft checks also require `NOTE_XSRF_TOKEN`.
-Credentials and full response bodies are not printed.
+When `NOTE_LIVE_EYECATCH_TESTS=true` is also set, the smoke check uploads the
+repository test image to that draft, reads the eyecatch back, and verifies that
+the draft remains unpublished. Credentials and full response bodies are not printed.
 
 ## Change policy
 

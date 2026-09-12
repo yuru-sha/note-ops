@@ -1,6 +1,6 @@
 ---
 name: note-management-workflow
-description: Draft, inspect, revise, and save one note.com article through the five note-ops MCP tools, with confirmation before every draft write.
+description: Draft, inspect, revise, save, and set one note.com article eyecatch through the six note-ops MCP tools, with confirmation before every write.
 ---
 
 # Note.com article workflow
@@ -12,6 +12,7 @@ revise one note.com article. The MCP server remains the execution boundary.
 
 - Source material, supplied in the request or an already available local file.
 - Optional title, tags, and existing note ID/key.
+- Optional local eyecatch image path.
 - The intended action: prepare a new draft, or inspect/revise an existing one.
 
 If the target or intended action is ambiguous, ask before reading or writing.
@@ -30,7 +31,10 @@ Do not invent missing source material, title requirements, or tags.
    required immediately before every draft write.
 4. After confirmation, use `post-draft-note` for a new draft or `edit-note` for
    an existing note. Both operations must remain on the draft-save path.
-5. Report the saved draft status, note ID, and editor URL when available. Tell
+5. If an eyecatch image is requested, use `set-note-eyecatch` after the draft
+   exists. Treat this as a separate write and require explicit confirmation
+   immediately before it.
+6. Report the saved draft status, note ID, and editor URL when available. Tell
    the user that publication remains a deliberate manual action on note.com.
 
 The only permitted note-management MCP tools are:
@@ -39,6 +43,7 @@ The only permitted note-management MCP tools are:
 - `get-note`
 - `post-draft-note`
 - `edit-note`
+- `set-note-eyecatch`
 - `open-note-editor`
 
 Use no other MCP tools or note.com endpoints for this workflow.
@@ -52,5 +57,6 @@ Use no other MCP tools or note.com endpoints for this workflow.
   redacted actionable message. Do not retry a draft write automatically.
 - Keep credentials, cookies, tokens, and full article bodies out of logs and
   routine status output.
-- This workflow does not publish, comment, like, upload images, or analyze
-  other users. It has no analytics or content-strategy step.
+- This workflow does not publish, comment, like, upload body images, or analyze
+  other users. It may set a local eyecatch on the configured user's own draft
+  only after explicit confirmation. It has no analytics or content-strategy step.

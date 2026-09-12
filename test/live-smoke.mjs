@@ -2,11 +2,17 @@ import {
   hasConfiguredUserOwnership,
   hasUnpublishedDraft,
   isLiveDraftSmokeEnabled,
+  isLiveEyecatchSmokeEnabled,
   isLiveSmokeEnabled,
 } from "../build/utils/live-smoke.js";
 import { env } from "../build/config/environment.js";
 import { registerMvpTools } from "../build/tools/mvp-tools.js";
 import { redactSensitiveValues } from "../build/utils/safe-logging.js";
+import { fileURLToPath } from "node:url";
+
+const testEyecatchPath = fileURLToPath(
+  new URL("../test-articles/images/test-image.png", import.meta.url)
+);
 
 if (!isLiveSmokeEnabled(process.env)) {
   console.log("Live smoke skipped: set NOTE_LIVE_TESTS=true to opt in.");
@@ -119,6 +125,41 @@ async function main() {
   console.log(
     "The smoke-test draft is retained for manual cleanup; delete only the draft created by this run."
   );
+
+  if (!isLiveEyecatchSmokeEnabled(process.env)) {
+    console.log("Eyecatch smoke skipped: set NOTE_LIVE_EYECATCH_TESTS=true to opt in.");
+    return;
+  }
+
+  const draftReference = created.noteId;
+  const draftDetailReference = created.noteKey || created.noteId;
+  await step("eyecatch upload", () =>
+    invoke(handlers, "set-note-eyecatch", {
+      noteId: draftReference,
+      imagePath: testEyecatchPath,
+    })
+  );
+  const updated = await step("eyecatch verification", () =>
+    invoke(handlers, "get-note", { noteId: draftDetailReference })
+  );
+  if (typeof updated.eyecatchUrl !== "string" || !updated.eyecatchUrl) {
+    throw new Error("The smoke-test draft detail did not contain an eyecatch URL.");
+  }
+
+  page = 1;
+  verified = false;
+  while (!verified) {
+    const drafts = await step(`eyecatch draft verification page ${page}`, () =>
+      invoke(handlers, "get-my-notes", { page, perPage: 100, status: "draft" })
+    );
+    verified = hasUnpublishedDraft(drafts.notes, String(created.noteId));
+    if (verified || !drafts.hasNextPage) break;
+    page += 1;
+  }
+  if (!verified) {
+    throw new Error("The smoke-test draft was not still unpublished after eyecatch upload.");
+  }
+  console.log("Eyecatch upload, read-back, and unpublished-draft verification passed.");
 }
 
 main().catch((error) => {
