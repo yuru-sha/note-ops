@@ -48,7 +48,11 @@ NOTE_XSRF_TOKEN=your_xsrf_token
 
 `NOTE_EMAIL` and `NOTE_PASSWORD` provide the optional direct-login path. Authentication is resolved lazily when an authenticated API call is made. Session cookies, XSRF tokens, passwords, and full response bodies stay out of logs and MCP responses.
 
+Authenticated operations require `NOTE_USER_ID` and an authentication source: `NOTE_SESSION_V5`, `NOTE_ALL_COOKIES`, or `NOTE_EMAIL` plus `NOTE_PASSWORD`. Draft write requests include an XSRF token from `NOTE_XSRF_TOKEN` or the authenticated session response when available. The note.com API may reject a draft write without it. When `NOTE_ALL_COOKIES` and `NOTE_LIVE_DRAFT_TESTS=true` are used, the live draft smoke preflight requires `NOTE_XSRF_TOKEN`. `open-note-editor` only builds a URL and requires `NOTE_USER_ID`; it does not make an authenticated API call.
+
 Before any authenticated list, read, create-draft, or edit-draft operation, the server resolves `current_user` and requires its `id` or `urlname` to match `NOTE_USER_ID`. If the identity is unavailable or mismatched, the operation fails closed with a redacted diagnostic. This check applies to session cookies, `NOTE_ALL_COOKIES`, and the optional email/password login path.
+
+`get-note` and `edit-note` also require the target note to belong to `NOTE_USER_ID`; missing or mismatched ownership fails closed. Authentication and API errors are returned as actionable MCP errors without secrets or full response bodies.
 
 ## Safety boundary
 
@@ -73,7 +77,7 @@ the additional `NOTE_LIVE_DRAFT_TESTS=true` flag, uses an identifiable smoke-tes
 draft, verifies it appears in the authenticated user's draft list after editing,
 and never publishes it. The smoke-test draft is retained for manual cleanup; only
 the explicitly identified draft created by that run may be deleted. When
-`NOTE_ALL_COOKIES` is used, draft checks also require `NOTE_XSRF_TOKEN`.
+`NOTE_ALL_COOKIES` and `NOTE_LIVE_DRAFT_TESTS=true` are used, draft checks also require `NOTE_XSRF_TOKEN`.
 Credentials and full response bodies are not printed.
 
 ## Change policy

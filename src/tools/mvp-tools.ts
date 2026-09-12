@@ -40,6 +40,16 @@ function toNoteHtml(body: string): string {
   return looksLikeHtml(body) ? body : convertMarkdownToNoteHtml(body);
 }
 
+export function draftNoteKey(id: string, key?: unknown): string {
+  if (typeof key === "string" && key) return key;
+  return id.startsWith("n") ? id : `n${id}`;
+}
+
+export function noteKeyFromPayload(note: any): string | undefined {
+  const key = note?.key ?? note?.note_key ?? note?.noteKey;
+  return typeof key === "string" && key ? key : undefined;
+}
+
 async function getCreateDraftEndpoint(): Promise<string> {
   if (!env.NOTE_USER_ID) {
     throw new Error("新規下書きの作成にはNOTE_USER_IDが必要です。.envを確認してください。");
@@ -61,7 +71,7 @@ async function getCreateDraftEndpoint(): Promise<string> {
   return `/v1/text_notes?user_id=${encodeURIComponent(cachedNoteApiUserId)}`;
 }
 
-async function resolveNumericNoteId(noteId: string): Promise<string> {
+async function resolveNoteReference(noteId: string): Promise<{ id: string; key?: string }> {
   const result = await noteApiRequest(
     `/v3/notes/${encodeURIComponent(noteId)}`,
     "GET",
@@ -70,7 +80,11 @@ async function resolveNumericNoteId(noteId: string): Promise<string> {
   );
   const payload = extractNotePayload(result);
   ensureNoteOwnership(payload);
-  return String(payload.id || noteId);
+  const key = noteKeyFromPayload(payload);
+  return {
+    id: String(payload.id || noteId),
+    key: key || (noteId.startsWith("n") ? noteId : undefined),
+  };
 }
 
 function ensureNoteOwnership(note: any): void {
@@ -194,6 +208,7 @@ export function registerMvpTools(server: McpServer): void {
     async ({ title, body, tags, id }) => {
       try {
         const html = toNoteHtml(body);
+        let createdNoteKey: string | undefined;
 
         if (!id) {
           const created = await noteApiRequest(
@@ -206,9 +221,12 @@ export function registerMvpTools(server: McpServer): void {
           const payload = extractNotePayload(created);
           const note = payload.note || payload;
           id = String(note.id || payload.note_id || payload.noteId || "");
+          createdNoteKey = noteKeyFromPayload(note) || noteKeyFromPayload(payload);
           if (!id) throw new Error("下書きの作成に失敗しました。");
         } else {
-          id = await resolveNumericNoteId(id);
+          const resolved = await resolveNoteReference(id);
+          id = resolved.id;
+          createdNoteKey = resolved.key;
         }
 
         await noteApiRequest(
@@ -225,7 +243,7 @@ export function registerMvpTools(server: McpServer): void {
           true,
           draftHeaders()
         );
-        const noteKey = id.startsWith("n") ? id : `n${id}`;
+        const noteKey = draftNoteKey(id, createdNoteKey);
         return createSuccessResponse({
           success: true,
           noteId: id,
@@ -249,7 +267,7 @@ export function registerMvpTools(server: McpServer): void {
     },
     async ({ noteId, title, body, tags }) => {
       try {
-        const id = await resolveNumericNoteId(noteId);
+        const { id } = await resolveNoteReference(noteId);
         const html = toNoteHtml(body);
         await noteApiRequest(
           `/v1/text_notes/draft_save?id=${encodeURIComponent(id)}&is_temp_saved=true`,

@@ -93,7 +93,7 @@ async function main() {
 
   await step("draft editing", () =>
     invoke(handlers, "edit-note", {
-      noteId: created.noteId,
+      noteId: created.noteKey || created.noteId,
       title: `${title} edited`,
       body: `${body} edited`,
       tags: ["note-ops-live-smoke"],
