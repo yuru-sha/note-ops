@@ -1,8 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { MVP_TOOL_NAMES } from "../build/tools/mvp-tools.js";
+import { MVP_TOOL_NAMES, buildNoteListQuery } from "../build/tools/mvp-tools.js";
+import {
+  extractNotePayload,
+  normalizeNoteListResponse,
+  noteBelongsToUser,
+  noteOwnership,
+} from "../build/utils/note-normalizers.js";
 import { convertMarkdownToNoteHtml, looksLikeHtml } from "../build/utils/markdown-converter.js";
 import { createErrorResponse, handleApiError } from "../build/utils/error-handler.js";
+import { formatNote } from "../build/utils/formatters.js";
 
 test("MVP exposes only note management tools", () => {
   assert.deepEqual([...MVP_TOOL_NAMES], [
@@ -41,4 +48,42 @@ test("Authentication secrets are redacted from errors and logs", () => {
   }
   assert.doesNotMatch(logged.join("\n"), /session-secret|xsrf-secret|owner@example.com|password-secret/);
   assert.match(createErrorResponse(secretMessage).content[0].text, /REDACTED/);
+});
+
+test("Note responses are normalized across authenticated API shapes", () => {
+  const response = {
+    data: {
+      notes: {
+        contents: [
+          { type: "note", note: { id: 12, name: "記事", key: "n-key" } },
+        ],
+        total_count: 4,
+      },
+    },
+  };
+
+  assert.deepEqual(normalizeNoteListResponse(response), {
+    notes: [{ id: 12, name: "記事", key: "n-key" }],
+    total: 4,
+  });
+  assert.deepEqual(extractNotePayload({ data: { note: { id: 12 } } }), { id: 12 });
+  assert.equal(noteBelongsToUser({ user: { urlname: "owner" } }, "owner"), true);
+  assert.equal(noteBelongsToUser({ user: { urlname: "other" } }, "owner"), false);
+  assert.equal(noteOwnership({ id: 12 }, "owner"), "unknown");
+});
+
+test("Draft fields and note-list queries match note.com response shapes", () => {
+  const formatted = formatNote({
+    id: "12",
+    name: "Draft",
+    body: "",
+    user: { urlname: "owner" },
+    note_draft: { body: "<p>draft body</p>", updated_at: "2026-09-12" },
+  });
+
+  assert.equal(formatted.body, "<p>draft body</p>");
+  assert.equal(formatted.hasDraftContent, true);
+  assert.equal(formatted.lastUpdated, "2026-09-12");
+  assert.equal(buildNoteListQuery(2, 20, "all"), "limit=20&page=2");
+  assert.equal(buildNoteListQuery(2, 20, "draft"), "limit=20&page=2&status=draft");
 });

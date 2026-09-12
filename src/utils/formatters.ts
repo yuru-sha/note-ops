@@ -22,6 +22,7 @@ export function formatNote(
   analyzeContent?: boolean
 ): FormattedNote {
   const user = note.user || {};
+  const draft = note.noteDraft || note.note_draft;
 
   // コンテンツ分析用データの整形
   const hasEyecatch = Boolean(note.eyecatch || note.sp_eyecatch);
@@ -51,7 +52,7 @@ export function formatNote(
     id: note.id || "",
     key: note.key || "",
     title: note.name || "",
-    body: note.body || note.noteDraft?.body || "",
+    body: note.body || draft?.body || "",
     excerpt: note.body
       ? note.body.length > 100
         ? note.body.substring(0, 100) + "..."
@@ -66,8 +67,8 @@ export function formatNote(
     isDraft: note.status === "draft",
     format: note.format || "",
     editUrl: `https://note.com/${username || user.urlname || "unknown"}/n/${note.key || ""}/edit`,
-    hasDraftContent: Boolean(note.noteDraft),
-    lastUpdated: note.noteDraft?.updatedAt || note.createdAt || "",
+    hasDraftContent: Boolean(draft),
+    lastUpdated: draft?.updatedAt || draft?.updated_at || note.createdAt || "",
 
     // eyecatchUrlを常に含める
     eyecatchUrl,

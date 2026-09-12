@@ -41,6 +41,10 @@ export function hasAuth(): boolean {
   );
 }
 
+export function hasSessionAuth(): boolean {
+  return Boolean(activeSessionCookie || env.NOTE_SESSION_V5 || process.env.NOTE_ALL_COOKIES);
+}
+
 // noteへのログイン処理を行う関数
 export async function loginToNote(): Promise<boolean> {
   if (!env.NOTE_EMAIL || !env.NOTE_PASSWORD) {
