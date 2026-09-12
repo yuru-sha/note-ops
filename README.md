@@ -63,6 +63,6 @@ npm test
 npm run test:live
 ```
 
-下書きの作成・編集まで確認する場合だけ `NOTE_LIVE_DRAFT_TESTS=true` も設定してください。`NOTE_ALL_COOKIES` を使う場合は `NOTE_XSRF_TOKEN` も必要です。実行時刻を含む `[note-ops live smoke ...]` のタイトルで識別できる下書きを作成・編集し、公開せずに残します。live smoke は資格情報や full response body を出力しません。失敗時は操作名と確認事項だけを redacted して表示します。
+read smoke は `current_user` の一致と記事詳細の設定ユーザー所有を確認します。下書きの作成・編集まで確認する場合だけ `NOTE_LIVE_DRAFT_TESTS=true` も設定してください。`NOTE_ALL_COOKIES` を使う場合は `NOTE_XSRF_TOKEN` も必要です。実行時刻を含む `[note-ops live smoke ...]` のタイトルで識別できる下書きを作成・編集し、認証済みの下書き一覧への再取得で未公開状態を確認したうえで残します。作成した下書きは自動削除せず、cleanupする場合はその実行で作成した下書きだけを明示的に対象にしてください。live smoke は資格情報や full response body を出力しません。失敗時は操作名と確認事項だけを redacted して表示します。
 
 仕様の詳細は [SPEC.md](SPEC.md) を参照してください。note.comの非公開API仕様変更により動作しなくなる可能性があります。

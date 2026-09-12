@@ -1,4 +1,9 @@
-import { isLiveDraftSmokeEnabled, isLiveSmokeEnabled } from "../build/utils/live-smoke.js";
+import {
+  hasConfiguredUserOwnership,
+  hasUnpublishedDraft,
+  isLiveDraftSmokeEnabled,
+  isLiveSmokeEnabled,
+} from "../build/utils/live-smoke.js";
 import { env } from "../build/config/environment.js";
 import { registerMvpTools } from "../build/tools/mvp-tools.js";
 import { redactSensitiveValues } from "../build/utils/safe-logging.js";
@@ -55,16 +60,19 @@ async function main() {
 
   const handlers = registerHandlers();
   const list = await step("article list", () =>
-    invoke(handlers, "get-my-notes", { page: 1, perPage: 20, status: "public" })
+    invoke(handlers, "get-my-notes", { page: 1, perPage: 20, status: "all" })
   );
   if (!Array.isArray(list.notes)) {
     throw new Error("The article list response did not contain a notes array.");
   }
 
-  await step("article detail", () =>
+  const detail = await step("article detail", () =>
     invoke(handlers, "get-note", { noteId: process.env.NOTE_LIVE_NOTE_ID })
   );
-  console.log("Authenticated article-list and article-detail smoke passed.");
+  if (!hasConfiguredUserOwnership(detail, env.NOTE_USER_ID)) {
+    throw new Error("The article detail is not owned by NOTE_USER_ID.");
+  }
+  console.log("Authenticated identity and configured-user ownership checks passed.");
 
   if (!isLiveDraftSmokeEnabled(process.env)) {
     console.log("Draft smoke skipped: set NOTE_LIVE_DRAFT_TESTS=true to opt in.");
@@ -91,7 +99,26 @@ async function main() {
       tags: ["note-ops-live-smoke"],
     })
   );
-  console.log("Authenticated draft creation and editing smoke passed; the draft remains unpublished.");
+
+  let page = 1;
+  let verified = false;
+  while (!verified) {
+    const drafts = await step(`draft verification page ${page}`, () =>
+      invoke(handlers, "get-my-notes", { page, perPage: 100, status: "draft" })
+    );
+    verified = hasUnpublishedDraft(drafts.notes, String(created.noteId));
+    if (verified || !drafts.hasNextPage) break;
+    page += 1;
+  }
+  if (!verified) {
+    throw new Error("The smoke-test draft was not found as an unpublished draft.");
+  }
+  console.log(
+    "Authenticated draft creation, editing, and unpublished-draft verification passed."
+  );
+  console.log(
+    "The smoke-test draft is retained for manual cleanup; delete only the draft created by this run."
+  );
 }
 
 main().catch((error) => {
