@@ -71,8 +71,9 @@ async function main() {
     return;
   }
 
-  const title = "[note-ops live smoke]";
-  const body = `note-ops authenticated live smoke ${new Date().toISOString()}`;
+  const runId = new Date().toISOString();
+  const title = `[note-ops live smoke ${runId}]`;
+  const body = `note-ops authenticated live smoke ${runId}`;
   const created = await step("draft creation", () =>
     invoke(handlers, "post-draft-note", {
       title,
