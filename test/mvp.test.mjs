@@ -16,6 +16,7 @@ import { formatNote } from "../build/utils/formatters.js";
 import { isLiveSmokeEnabled, isLiveDraftSmokeEnabled } from "../build/utils/live-smoke.js";
 
 const repositoryRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
+const agentInstructions = readFileSync(join(repositoryRoot, "AGENTS.md"), "utf8");
 const workflowSkill = readFileSync(
   join(repositoryRoot, "skills/note-management-workflow/SKILL.md"),
   "utf8"
@@ -55,6 +56,11 @@ test("note workflow skill documents the safe five-tool contract", () => {
   for (const boundary of ["publish", "comment", "like", "upload images", "other users"]) {
     assert.match(workflowSkill, new RegExp(boundary, "i"));
   }
+});
+
+test("note workflow skill is discoverable from project instructions", () => {
+  assert.match(agentInstructions, /skills\/note-management-workflow\/SKILL\.md/);
+  assert.match(agentInstructions, /before using the MCP workflow/i);
 });
 
 test("Live smoke tests require both explicit opt-in flags", () => {
