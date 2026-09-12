@@ -20,8 +20,3 @@ export function noteBelongsToUser(note: any, userId: string): boolean {
     .filter(Boolean)
     .some((value) => String(value) === userId);
 }
-
-export function selectNotesPage<T>(notes: T[], page: number, perPage: number): T[] {
-  const start = (page - 1) * perPage;
-  return notes.slice(start, start + perPage);
-}

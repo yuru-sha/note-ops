@@ -1,11 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { MVP_TOOL_NAMES } from "../build/tools/mvp-tools.js";
+import { MVP_TOOL_NAMES, buildNoteListQuery } from "../build/tools/mvp-tools.js";
 import {
   extractNotePayload,
   normalizeNoteListResponse,
   noteBelongsToUser,
-  selectNotesPage,
 } from "../build/utils/note-normalizers.js";
 import { convertMarkdownToNoteHtml, looksLikeHtml } from "../build/utils/markdown-converter.js";
 import { createErrorResponse, handleApiError } from "../build/utils/error-handler.js";
@@ -71,7 +70,7 @@ test("Note responses are normalized across authenticated API shapes", () => {
   assert.equal(noteBelongsToUser({ user: { urlname: "other" } }, "owner"), false);
 });
 
-test("Draft fields and requested note pages support API shape differences", () => {
+test("Draft fields and note-list queries match note.com response shapes", () => {
   const formatted = formatNote({
     id: "12",
     name: "Draft",
@@ -83,5 +82,6 @@ test("Draft fields and requested note pages support API shape differences", () =
   assert.equal(formatted.body, "<p>draft body</p>");
   assert.equal(formatted.hasDraftContent, true);
   assert.equal(formatted.lastUpdated, "2026-09-12");
-  assert.deepEqual(selectNotesPage([1, 2, 3, 4], 2, 2), [3, 4]);
+  assert.equal(buildNoteListQuery(2, 20, "all"), "limit=20&page=2");
+  assert.equal(buildNoteListQuery(2, 20, "draft"), "limit=20&page=2&status=draft");
 });
