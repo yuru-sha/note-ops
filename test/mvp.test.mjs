@@ -7,6 +7,7 @@ import {
   MVP_TOOL_NAMES,
   buildNoteListQuery,
   draftNoteKey,
+  noteKeyFromPayload,
 } from "../build/tools/mvp-tools.js";
 import {
   extractNotePayload,
@@ -142,6 +143,9 @@ test("Markdown is converted without double-wrapping HTML", () => {
 test("Draft responses preserve note.com keys", () => {
   assert.equal(draftNoteKey("179921781", "n318f64f66b50"), "n318f64f66b50");
   assert.equal(draftNoteKey("123"), "n123");
+  for (const alias of ["key", "note_key", "noteKey"]) {
+    assert.equal(noteKeyFromPayload({ [alias]: "n318f64f66b50" }), "n318f64f66b50");
+  }
 });
 
 test("Authentication secrets are redacted from errors and logs", () => {

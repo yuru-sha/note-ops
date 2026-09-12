@@ -45,6 +45,11 @@ export function draftNoteKey(id: string, key?: unknown): string {
   return id.startsWith("n") ? id : `n${id}`;
 }
 
+export function noteKeyFromPayload(note: any): string | undefined {
+  const key = note?.key ?? note?.note_key ?? note?.noteKey;
+  return typeof key === "string" && key ? key : undefined;
+}
+
 async function getCreateDraftEndpoint(): Promise<string> {
   if (!env.NOTE_USER_ID) {
     throw new Error("新規下書きの作成にはNOTE_USER_IDが必要です。.envを確認してください。");
@@ -75,9 +80,10 @@ async function resolveNoteReference(noteId: string): Promise<{ id: string; key?:
   );
   const payload = extractNotePayload(result);
   ensureNoteOwnership(payload);
+  const key = noteKeyFromPayload(payload);
   return {
     id: String(payload.id || noteId),
-    key: typeof payload.key === "string" ? payload.key : noteId.startsWith("n") ? noteId : undefined,
+    key: key || (noteId.startsWith("n") ? noteId : undefined),
   };
 }
 
@@ -215,8 +221,7 @@ export function registerMvpTools(server: McpServer): void {
           const payload = extractNotePayload(created);
           const note = payload.note || payload;
           id = String(note.id || payload.note_id || payload.noteId || "");
-          const key = note.key || payload.key || payload.note_key || payload.noteKey;
-          createdNoteKey = typeof key === "string" && key ? key : undefined;
+          createdNoteKey = noteKeyFromPayload(note) || noteKeyFromPayload(payload);
           if (!id) throw new Error("下書きの作成に失敗しました。");
         } else {
           const resolved = await resolveNoteReference(id);
