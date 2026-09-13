@@ -78,6 +78,22 @@ test("MVP exposes only note management tools", () => {
   ]);
 });
 
+test("project instructions match the six-tool MVP contract", () => {
+  assert.match(agentInstructions, /six-tool MVP contract/i);
+  assert.doesNotMatch(agentInstructions, /five-tool MVP contract/i);
+  assert.match(agentInstructions, /draft-save path/i);
+  assert.match(agentInstructions, /draft metadata path/i);
+  assert.match(
+    agentInstructions,
+    /configured-user identity before authenticated list, read, create-draft, or edit-draft operations/i
+  );
+  assert.match(
+    agentInstructions,
+    /target-note ownership for `get-note`, `edit-note`, and `set-note-eyecatch`; fail closed when identity or ownership is unavailable, mismatched, or conflicting/i
+  );
+  assert.match(agentInstructions, /require an XSRF token for draft and eyecatch writes/i);
+});
+
 test("Eyecatch uploads use the note API multipart contract", async () => {
   const form = buildEyecatchFormData("123", "cover.png", "image/png", Buffer.from("image"));
   assert.equal(form.get("note_id"), "123");
