@@ -28,6 +28,7 @@ import {
 import { convertMarkdownToNoteHtml, looksLikeHtml } from "../build/utils/markdown-converter.js";
 import { createErrorResponse, handleApiError } from "../build/utils/error-handler.js";
 import { formatNote } from "../build/utils/formatters.js";
+import { noteApiRequest } from "../build/utils/api-client.js";
 import {
   hasConfiguredUserOwnership,
   hasUnpublishedDraft,
@@ -87,6 +88,84 @@ test("Eyecatch uploads use the note API multipart contract", async () => {
   assert.equal(file.type, "image/png");
   assert.equal(file.size, 5);
   assert.deepEqual([...new Uint8Array(await file.arrayBuffer())], [...Buffer.from("image")]);
+});
+
+test("API requests replace case-insensitive multipart headers and retain JSON defaults", async () => {
+  const requests = [];
+  const fetcher = async (_url, options) => {
+    requests.push(options);
+    return { ok: true, status: 200, json: async () => ({}) };
+  };
+  const form = buildEyecatchFormData("123", "cover.png", "image/png", Buffer.from("image"));
+
+  await noteApiRequest(
+    "/v1/image_upload/note_eyecatch",
+    "POST",
+    form,
+    false,
+    { origin: "https://editor.note.com", referer: "https://editor.note.com/" },
+    fetcher
+  );
+  await noteApiRequest("/v1/text_notes/draft_save", "POST", { body: "<p>本文</p>" }, false, undefined, fetcher);
+
+  const header = (headers, name) => {
+    const matches = Object.entries(headers).filter(([key]) => key.toLowerCase() === name);
+    assert.equal(matches.length, 1);
+    return matches[0][1];
+  };
+  assert.equal(header(requests[0].headers, "origin"), "https://editor.note.com");
+  assert.equal(header(requests[0].headers, "referer"), "https://editor.note.com/");
+  assert.equal(header(requests[1].headers, "origin"), "https://note.com");
+  assert.equal(header(requests[1].headers, "referer"), "https://note.com/");
+  assert.equal(header(requests[1].headers, "content-type"), "application/json");
+});
+
+test("Eyecatch handler keeps ownership, draft, and XSRF guards before upload", async () => {
+  const originalUserId = env.NOTE_USER_ID;
+  const imagePath = join(repositoryRoot, "test-articles/images/test-image.png");
+  const uploadEndpoints = [];
+  const fetchRequests = [];
+  const fetcher = async (_url, options) => {
+    fetchRequests.push(options);
+    return { ok: true, status: 200, json: async () => ({}) };
+  };
+  env.NOTE_USER_ID = "owner";
+
+  const run = async ({ user = { id: "123", urlname: "owner" }, status = "draft", xsrf = null }) => {
+    setActiveSessionCookie("session");
+    if (xsrf) setActiveXsrfToken(xsrf);
+    assertCurrentUserMatchesConfiguredUser({ data: { user: { id: "123", urlname: "owner" } } }, "owner");
+    const request = async (endpoint, method, body, _requireAuth, customHeaders) => {
+      if (endpoint.startsWith("/v3/notes/")) {
+        return { data: { note: { id: "123", key: "n123", status, user } } };
+      }
+      uploadEndpoints.push(endpoint);
+      return noteApiRequest(endpoint, method, body, false, customHeaders, fetcher);
+    };
+    return registerHandlers(request).get("set-note-eyecatch")({ noteId: "n123", imagePath });
+  };
+
+  try {
+    assert.equal((await run({ user: { id: "999", urlname: "other" }, xsrf: "xsrf" })).isError, true);
+    assert.equal((await run({ status: "published", xsrf: "xsrf" })).isError, true);
+    assert.equal((await run({ xsrf: null })).isError, true);
+    const success = await run({ xsrf: "xsrf" });
+    assert.equal(success.isError, undefined);
+    assert.deepEqual(uploadEndpoints, ["/v1/image_upload/note_eyecatch"]);
+    assert.equal(fetchRequests.length, 1);
+    const header = (name) => {
+      const matches = Object.entries(fetchRequests[0].headers).filter(
+        ([key]) => key.toLowerCase() === name
+      );
+      assert.equal(matches.length, 1);
+      return matches[0][1];
+    };
+    assert.equal(header("origin"), "https://editor.note.com");
+    assert.equal(header("referer"), "https://editor.note.com/");
+  } finally {
+    env.NOTE_USER_ID = originalUserId;
+    setActiveSessionCookie("");
+  }
 });
 
 test("Eyecatch validation accepts supported formats and rejects unsafe sizes", () => {

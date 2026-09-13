@@ -10,7 +10,8 @@ export async function noteApiRequest(
   method: string = "GET",
   body: any = null,
   requireAuth: boolean = false,
-  customHeaders?: { [key: string]: string }
+  customHeaders?: { [key: string]: string },
+  requestFetch: typeof fetch = fetch
 ): Promise<NoteApiResponse> {
   const headers: { [key: string]: string } = {
     ...DEFAULT_HEADERS,
@@ -34,7 +35,13 @@ export async function noteApiRequest(
 
   // customHeadersがある場合は最後に適用（優先）
   if (customHeaders) {
-    Object.assign(headers, customHeaders);
+    for (const [name, value] of Object.entries(customHeaders)) {
+      const existingName = Object.keys(headers).find(
+        (headerName) => headerName.toLowerCase() === name.toLowerCase()
+      );
+      if (existingName) delete headers[existingName];
+      headers[name] = value;
+    }
   }
 
   const options: any = {
@@ -56,7 +63,7 @@ export async function noteApiRequest(
       console.error(`API request: auth=${hasAuth() ? "present" : "absent"}`);
     }
 
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, options);
+    const response = await requestFetch(`${API_BASE_URL}${endpoint}`, options);
     if (env.DEBUG) console.error(`API response: status=${response.status}`);
 
     if (!response.ok) {
