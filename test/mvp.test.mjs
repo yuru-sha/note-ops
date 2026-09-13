@@ -135,10 +135,11 @@ test("Eyecatch handler keeps ownership, draft, and XSRF guards before upload", a
     setActiveSessionCookie("session");
     if (xsrf) setActiveXsrfToken(xsrf);
     assertCurrentUserMatchesConfiguredUser({ data: { user: { id: "123", urlname: "owner" } } }, "owner");
-    const request = async (endpoint, method, body, _requireAuth, customHeaders) => {
+    const request = async (endpoint, method, body, requireAuth, customHeaders) => {
       if (endpoint.startsWith("/v3/notes/")) {
         return { data: { note: { id: "123", key: "n123", status, user } } };
       }
+      assert.equal(requireAuth, true);
       uploadEndpoints.push(endpoint);
       return noteApiRequest(endpoint, method, body, false, customHeaders, fetcher);
     };
