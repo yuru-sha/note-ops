@@ -15,7 +15,7 @@ Read `SPEC.md` before changing code. Treat it as the authoritative contract for 
 
 - Keep credentials in environment variables or the user's existing local session configuration.
 - Log operation names and HTTP status only. Credential values, cookies, XSRF tokens, passwords, and full response bodies remain private.
-- Verify configured-user ownership before authenticated mutations and fail closed on mismatch.
+- Verify configured-user identity before authenticated list, read, create-draft, or edit-draft operations, and verify target-note ownership for `get-note`, `edit-note`, and `set-note-eyecatch`; fail closed when identity or ownership is unavailable, mismatched, or conflicting.
 - Require an XSRF token for draft and eyecatch writes; keep it in the configured environment or authenticated session.
 - Encode note IDs and keys before placing them in paths or URLs.
 - Preserve the stdio-only default until the HTTP/n8n requirement is explicitly accepted.
