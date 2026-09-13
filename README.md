@@ -1,5 +1,7 @@
 # note-ops
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/yuru-sha/note-ops)
+
 note.comの記事と下書きを管理するための、ローカルstdio MCPサーバーです。
 現在は下書き中心のMVPだけを提供しています。
 
