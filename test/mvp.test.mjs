@@ -98,7 +98,10 @@ test("eyecatch documentation makes the draft-only boundary explicit", () => {
   assert.match(readme, /`set-note-eyecatch`[^\n]*自分の下書き[^\n]*タイトル画像/);
   assert.match(readme, /タイトル画像は、認証済みの自分の下書きに対して/);
   assert.match(spec, /\| `set-note-eyecatch` \| .*configured user's own draft.* \| Draft metadata update \|/i);
-  assert.match(workflowSkill, /configured user's own draft\s+only/i);
+  assert.match(
+    workflowSkill,
+    /5\.\s+If an eyecatch image is requested for the configured user's own draft,\s+use\s+`set-note-eyecatch` after the draft\s+exists\./i
+  );
   assert.doesNotMatch(readme, /タイトル画像は、認証済みの自分の記事に対して/);
 });
 
