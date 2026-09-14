@@ -33,9 +33,9 @@ Do not invent missing source material, title requirements, or tags.
    required immediately before every draft write.
 4. After confirmation, use `post-draft-note` for a new draft or `edit-note` for
    an existing note. Both operations must remain on the draft-save path.
-5. If an eyecatch image is requested, use `set-note-eyecatch` after the draft
-   exists. Treat this as a separate write and require explicit confirmation
-   immediately before it.
+5. If an eyecatch image is requested for the configured user's own draft, use
+   `set-note-eyecatch` after the draft exists. Treat this as a separate write
+   and require explicit confirmation immediately before it.
 6. Report the saved draft status, note ID, and editor URL when available. Tell
    the user that publication remains a deliberate manual action on note.com.
 

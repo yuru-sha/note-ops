@@ -18,7 +18,7 @@ npm start
 
 認証対象の一覧取得・詳細取得・下書き作成・下書き編集には、`NOTE_USER_ID` と、既存セッション（`NOTE_SESSION_V5`。下書き操作では `NOTE_XSRF_TOKEN` またはセッション応答のXSRFトークンを使用）、`NOTE_ALL_COOKIES`、または `NOTE_EMAIL` と `NOTE_PASSWORD` の直接ログインを設定します。認証値はコミットせず、ログやMCPレスポンスに出力しないでください。
 
-認証対象の操作では、note.com の `current_user` と `NOTE_USER_ID` が一致することを事前に確認します。`get-note` と `edit-note` では記事の所有者も確認します。`get-note` に numeric ID を渡した場合は、認証済みユーザーの記事一覧から note key を解決して詳細を取得します。一致しない、所有者を確認できない、note key を解決できない、または認証に失敗した場合は処理を中止し、秘密情報を含まないエラーを返します。`open-note-editor` はURL生成だけを行い、`NOTE_USER_ID` の設定のみを確認します。
+認証対象の操作では、note.com の `current_user` と `NOTE_USER_ID` が一致することを事前に確認します。`get-note`、`edit-note`、`set-note-eyecatch` では記事の所有者も確認します。`get-note` に numeric ID を渡した場合は、認証済みユーザーの記事一覧から note key を解決して詳細を取得します。一致しない、所有者を確認できない、note key を解決できない、または認証に失敗した場合は処理を中止し、秘密情報を含まないエラーを返します。`open-note-editor` はURL生成だけを行い、`NOTE_USER_ID` の設定のみを確認します。
 
 ## MCPツール
 
@@ -28,10 +28,10 @@ npm start
 | `get-note` | 記事・下書き詳細 | 読み取り |
 | `post-draft-note` | 新規下書き作成・更新 | 下書き保存 |
 | `edit-note` | 既存記事を下書き保存 | 下書き保存 |
-| `set-note-eyecatch` | ローカル画像を記事のタイトル画像に設定 | アイキャッチ更新 |
+| `set-note-eyecatch` | 自分の下書きにローカル画像をタイトル画像として設定 | 下書きメタデータ更新 |
 | `open-note-editor` | 編集URL生成 | 読み取り |
 
-公開、コメント、スキ、本文画像のアップロード、検索、Notion、Obsidian、HTTP/n8n、ブラウザ自動化はMVPの対象外です。公開操作はnote.comから行ってください。タイトル画像は、認証済みの自分の記事に対して、PNG/JPEG/GIF/WebPのローカルファイル（10MB以下）だけを設定できます。`post-draft-note` は note.com の create response、または認証済み下書き一覧から実際の note key を返します。
+公開、コメント、スキ、本文画像のアップロード、検索、Notion、Obsidian、HTTP/n8n、ブラウザ自動化はMVPの対象外です。公開操作はnote.comから行ってください。タイトル画像は、認証済みの自分の下書きに対して、PNG/JPEG/GIF/WebPのローカルファイル（10MB以下）だけを設定できます。公開済み記事には設定できません。`post-draft-note` は note.com の create response、または認証済み下書き一覧から実際の note key を返します。
 
 ## MCPクライアント設定例
 

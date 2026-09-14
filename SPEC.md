@@ -24,7 +24,7 @@ The default server exposes exactly these tools:
 | `get-note` | Read an article or draft by ID/key | No |
 | `post-draft-note` | Create or save a draft | Draft save |
 | `edit-note` | Save an existing article as a draft | Draft save |
-| `set-note-eyecatch` | Upload a local image and set it as the article eyecatch | Draft metadata update |
+| `set-note-eyecatch` | Upload a local image and set it as the configured user's own draft eyecatch | Draft metadata update |
 | `open-note-editor` | Build the note editor URL | No |
 
 ## Tool rules
@@ -34,7 +34,7 @@ The default server exposes exactly these tools:
 - `post-draft-note` accepts Markdown or HTML. Markdown is converted to note.com HTML; already-HTML input is preserved.
 - `post-draft-note` returns the note key from the create response or the authenticated draft list when note.com omits it; it does not fabricate a key from the numeric ID.
 - `edit-note` resolves note keys when necessary and always uses the draft-save path.
-- `set-note-eyecatch` accepts a local PNG, JPEG, GIF, or WebP file up to 10 MB, validates it before the request, and uses note.com's eyecatch upload endpoint with the configured article ownership checks.
+- `set-note-eyecatch` accepts a local PNG, JPEG, GIF, or WebP file up to 10 MB, validates it before the request, and uses note.com's eyecatch upload endpoint for the configured user's own draft with ownership checks.
 - `open-note-editor` requires `NOTE_USER_ID` and returns an editor URL.
 - Note IDs and keys are URL-encoded before API or URL construction.
 - API errors are returned as MCP error responses with actionable, non-secret messages.

@@ -94,6 +94,17 @@ test("project instructions match the six-tool MVP contract", () => {
   assert.match(agentInstructions, /require an XSRF token for draft and eyecatch writes/i);
 });
 
+test("eyecatch documentation makes the draft-only boundary explicit", () => {
+  assert.match(readme, /`set-note-eyecatch`[^\n]*自分の下書き[^\n]*タイトル画像/);
+  assert.match(readme, /タイトル画像は、認証済みの自分の下書きに対して/);
+  assert.match(spec, /\| `set-note-eyecatch` \| .*configured user's own draft.* \| Draft metadata update \|/i);
+  assert.match(
+    workflowSkill,
+    /5\.\s+If an eyecatch image is requested for the configured user's own draft,\s+use\s+`set-note-eyecatch` after the draft\s+exists\./i
+  );
+  assert.doesNotMatch(readme, /タイトル画像は、認証済みの自分の記事に対して/);
+});
+
 test("Eyecatch uploads use the note API multipart contract", async () => {
   const form = buildEyecatchFormData("123", "cover.png", "image/png", Buffer.from("image"));
   assert.equal(form.get("note_id"), "123");
