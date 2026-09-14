@@ -138,6 +138,7 @@ test("API requests replace case-insensitive multipart headers and retain JSON de
 
 test("Eyecatch handler keeps ownership, draft, and XSRF guards before upload", async () => {
   const originalUserId = env.NOTE_USER_ID;
+  const originalXsrfToken = env.NOTE_XSRF_TOKEN;
   const imagePath = join(repositoryRoot, "test-articles/images/test-image.png");
   const uploadEndpoints = [];
   const fetchRequests = [];
@@ -146,6 +147,7 @@ test("Eyecatch handler keeps ownership, draft, and XSRF guards before upload", a
     return { ok: true, status: 200, json: async () => ({}) };
   };
   env.NOTE_USER_ID = "owner";
+  env.NOTE_XSRF_TOKEN = "";
 
   const run = async ({ user = { id: "123", urlname: "owner" }, status = "draft", xsrf = null }) => {
     setActiveSessionCookie("session");
@@ -181,6 +183,7 @@ test("Eyecatch handler keeps ownership, draft, and XSRF guards before upload", a
     assert.equal(header("referer"), "https://editor.note.com/");
   } finally {
     env.NOTE_USER_ID = originalUserId;
+    env.NOTE_XSRF_TOKEN = originalXsrfToken;
     setActiveSessionCookie("");
   }
 });
