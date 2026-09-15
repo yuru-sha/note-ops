@@ -86,6 +86,9 @@ draft, verifies it appears in the authenticated user's draft list after editing,
 and never publishes it. The smoke-test draft is retained for manual cleanup; only
 the explicitly identified draft created by that run may be deleted. When
 `NOTE_ALL_COOKIES` and `NOTE_LIVE_DRAFT_TESTS=true` are used, draft checks also require `NOTE_XSRF_TOKEN`.
+Read-only smoke accepts `NOTE_SESSION_V5` without `NOTE_XSRF_TOKEN`; draft and
+eyecatch smoke stop before writing unless an XSRF token is configured or obtained
+from the authenticated session response.
 The draft smoke also reads the newly saved draft by its returned note key.
 When `NOTE_LIVE_EYECATCH_TESTS=true` is also set, the smoke check uploads the
 repository test image to that draft, reads the eyecatch back, and verifies that

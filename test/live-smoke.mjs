@@ -1,6 +1,7 @@
 import {
   hasConfiguredUserOwnership,
   hasUnpublishedDraft,
+  hasLiveSmokeAuthentication,
   isLiveDraftSmokeEnabled,
   isLiveEyecatchSmokeEnabled,
   isLiveSmokeEnabled,
@@ -8,6 +9,7 @@ import {
 import { env } from "../build/config/environment.js";
 import { registerMvpTools } from "../build/tools/mvp-tools.js";
 import { redactSensitiveValues } from "../build/utils/safe-logging.js";
+import { getActiveXsrfToken } from "../build/utils/auth.js";
 import { fileURLToPath } from "node:url";
 
 const testEyecatchPath = fileURLToPath(
@@ -53,11 +55,9 @@ async function main() {
     throw new Error("NOTE_LIVE_NOTE_ID is required for the detail read; no request was made.");
   }
 
-  const hasSession = Boolean(process.env.NOTE_SESSION_V5 && process.env.NOTE_XSRF_TOKEN);
-  const hasLogin = Boolean(process.env.NOTE_EMAIL && process.env.NOTE_PASSWORD);
-  if (!hasSession && !hasLogin && !process.env.NOTE_ALL_COOKIES) {
+  if (!hasLiveSmokeAuthentication(process.env)) {
     throw new Error(
-      "Set NOTE_SESSION_V5 and NOTE_XSRF_TOKEN, NOTE_ALL_COOKIES, or NOTE_EMAIL and NOTE_PASSWORD."
+      "Set NOTE_SESSION_V5, NOTE_ALL_COOKIES, or NOTE_EMAIL and NOTE_PASSWORD."
     );
   }
   if (isLiveDraftSmokeEnabled(process.env) && process.env.NOTE_ALL_COOKIES && !process.env.NOTE_XSRF_TOKEN) {
@@ -83,6 +83,9 @@ async function main() {
   if (!isLiveDraftSmokeEnabled(process.env)) {
     console.log("Draft smoke skipped: set NOTE_LIVE_DRAFT_TESTS=true to opt in.");
     return;
+  }
+  if (!process.env.NOTE_XSRF_TOKEN && !getActiveXsrfToken()) {
+    throw new Error("Draft smoke requires an XSRF token before any write request; no write was made.");
   }
 
   const runId = new Date().toISOString();

@@ -60,7 +60,7 @@ npm test
 - `NOTE_LIVE_TESTS=true`（必須の明示的 opt-in）
 - `NOTE_USER_ID`（必須）
 - `NOTE_LIVE_NOTE_ID`（detail read 用の既存記事または下書きの ID／key）
-- `NOTE_SESSION_V5` と `NOTE_XSRF_TOKEN`、`NOTE_ALL_COOKIES`、または `NOTE_EMAIL` と `NOTE_PASSWORD`
+- `NOTE_SESSION_V5`、`NOTE_ALL_COOKIES`、または `NOTE_EMAIL` と `NOTE_PASSWORD`（read smoke は `NOTE_SESSION_V5` だけで実行可）
 
 ```bash
 npm run test:live
