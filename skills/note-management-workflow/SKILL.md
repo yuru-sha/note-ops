@@ -53,9 +53,11 @@ body. The [note equation guide](https://www.help-note.com/hc/ja/articles/4410665
    asks to see the body.
 2. Inspect the target when needed with `get-my-notes` and `get-note`. Prefer the
    returned note key for detail reads; numeric IDs are resolved through the
-   authenticated user's list before `get-note` calls the detail endpoint. Use
-   `open-note-editor` when an editor link is useful. These reads do not change
-   note.com state.
+   authenticated user's list before `get-note` calls the detail endpoint. When
+   an editor link is useful, call `open-note-editor` and report its exact
+   `editUrl` result. Treat that returned editor URL as the single source of
+   truth; the public note URL and a URL derived by appending `/edit` are not
+   editor links. These reads do not change note.com state.
 3. Show the proposed action, target, title, tags, and a short body summary.
    Stop at an explicit confirmation boundary. A clear user confirmation is
    required immediately before every draft write.
@@ -64,8 +66,9 @@ body. The [note equation guide](https://www.help-note.com/hc/ja/articles/4410665
 5. If an eyecatch image is requested for the configured user's own draft, use
    `set-note-eyecatch` after the draft exists. Treat this as a separate write
    and require explicit confirmation immediately before it.
-6. Report the saved draft status, note ID, and editor URL when available. Tell
-   the user that publication remains a deliberate manual action on note.com.
+6. Report the saved draft status, note ID, and the exact editor URL returned by
+   `open-note-editor`. Tell the user that publication remains a deliberate
+   manual action on note.com.
 
 The only permitted note-management MCP tools are:
 
