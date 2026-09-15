@@ -18,6 +18,34 @@ revise one note.com article. The MCP server remains the execution boundary.
 If the target or intended action is ambiguous, ask before reading or writing.
 Do not invent missing source material, title requirements, or tags.
 
+## Math and comparison tables
+
+When an article needs a formula or a comparison table, use note's TeX/KaTeX
+notation instead of Markdown pipe tables. Note supports inline and display
+math; display delimiters must be `$$` on their own lines, with the expression
+between them. Comparison tables must always use the display form `$$...$$`,
+never the inline form `$...$`. Use KaTeX's supported `array` environment:
+
+```markdown
+$$
+\begin{array}{lrr}
+\text{項目} & \text{レンズA} & \text{レンズB} \\
+\hline
+\text{質量} & 994\,\mathrm{g} & 995\,\mathrm{g} \\
+\text{焦点距離} & 400\,\mathrm{mm} & 600\,\mathrm{mm}
+\end{array}
+$$
+```
+
+Use only commands and environments listed in the [KaTeX supported
+functions](https://katex.org/docs/supported.html) and [KaTeX support
+table](https://katex.org/docs/support_table.html). Keep raw HTML and unsupported
+color features out of equations. When sending the body through the MCP,
+preserve the display delimiters and line breaks as Markdown; do not wrap a
+display equation in an HTML paragraph. After saving, re-read the draft and
+check that pipe-table markers are absent and the `array` source remains in the
+body. The [note equation guide](https://www.help-note.com/hc/ja/articles/4410665086873-%E6%95%B0%E5%BC%8F%E8%A8%98%E6%B3%95%E3%81%AE%E4%BD%BF%E3%81%84%E6%96%B9) is the authority for note-specific delimiters and limitations.
+
 ## Workflow
 
 1. Prepare a candidate title, body, and tags from the supplied source. Keep the
