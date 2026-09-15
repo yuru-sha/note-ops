@@ -32,6 +32,7 @@ import { noteApiRequest } from "../build/utils/api-client.js";
 import {
   hasConfiguredUserOwnership,
   hasUnpublishedDraft,
+  hasLiveSmokeAuthentication,
   isLiveSmokeEnabled,
   isLiveDraftSmokeEnabled,
   isLiveEyecatchSmokeEnabled,
@@ -292,6 +293,12 @@ test("Live smoke tests require both explicit opt-in flags", () => {
     isLiveEyecatchSmokeEnabled({ NOTE_LIVE_TESTS: "true", NOTE_LIVE_EYECATCH_TESTS: "true" }),
     false
   );
+});
+
+test("Read-only live smoke accepts session authentication without XSRF", () => {
+  assert.equal(hasLiveSmokeAuthentication({ NOTE_SESSION_V5: "session" }), true);
+  assert.equal(hasLiveSmokeAuthentication({ NOTE_SESSION_V5: "session", NOTE_XSRF_TOKEN: "" }), true);
+  assert.equal(hasLiveSmokeAuthentication({ NOTE_USER_ID: "owner" }), false);
 });
 
 test("Live draft verification requires the created note in the draft list", () => {
