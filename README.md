@@ -18,7 +18,7 @@ npm start
 
 認証対象の一覧取得・詳細取得・下書き作成・下書き編集には、`NOTE_USER_ID` と、既存セッション（`NOTE_SESSION_V5`。下書き操作では `NOTE_XSRF_TOKEN` またはセッション応答のXSRFトークンを使用）、`NOTE_ALL_COOKIES`、または `NOTE_EMAIL` と `NOTE_PASSWORD` の直接ログインを設定します。認証値はコミットせず、ログやMCPレスポンスに出力しないでください。
 
-認証対象の操作では、note.com の `current_user` と `NOTE_USER_ID` が一致することを事前に確認します。`get-note`、`edit-note`、`set-note-eyecatch` では記事の所有者も確認します。`get-note` に numeric ID を渡した場合は、認証済みユーザーの記事一覧から note key を解決して詳細を取得します。一致しない、所有者を確認できない、note key を解決できない、または認証に失敗した場合は処理を中止し、秘密情報を含まないエラーを返します。`open-note-editor` はURL生成だけを行い、`NOTE_USER_ID` の設定のみを確認します。
+認証対象の操作では、note.com の `current_user` と `NOTE_USER_ID` が一致することを事前に確認します。`get-note`、`edit-note`、`set-note-eyecatch` では記事の所有者も確認します。`get-note` に numeric ID を渡した場合は、認証済みユーザーの記事一覧から note key を解決して詳細を取得します。`open-note-editor` も numeric ID の場合は認証済みユーザーの記事一覧から note key を解決し、`https://editor.note.com/notes/<note-key>/edit/` を返します。一致しない、所有者を確認できない、note key を解決できない、または認証に失敗した場合は処理を中止し、秘密情報を含まないエラーを返します。記事キーを直接渡した場合の `open-note-editor` は一覧取得を行いません。
 
 ## MCPツール
 

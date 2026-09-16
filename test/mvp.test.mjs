@@ -424,10 +424,67 @@ test("get-note resolves a numeric ID before the detail request", async () => {
   try {
     const response = await registerHandlers(request).get("get-note")({ noteId: "179921781" });
     assert.equal(response.isError, undefined);
-    assert.equal(JSON.parse(response.content[0].text).id, 179921781);
+    const result = JSON.parse(response.content[0].text);
+    assert.equal(result.id, 179921781);
+    assert.equal(result.editUrl, "https://editor.note.com/notes/n318f64f66b50/edit/");
     assert.equal(requests.filter(({ method }) => method === "GET").length, 2);
     assert.ok(requests.some(({ endpoint }) => endpoint.startsWith("/v3/notes/n318f64f66b50")));
     assert.ok(!requests.some(({ endpoint }) => endpoint.startsWith("/v3/notes/179921781")));
+  } finally {
+    env.NOTE_USER_ID = originalUserId;
+    setActiveSessionCookie("");
+  }
+});
+
+test("open-note-editor resolves numeric IDs to canonical editor URLs", async () => {
+  const originalUserId = env.NOTE_USER_ID;
+  env.NOTE_USER_ID = "owner";
+  assertCurrentUserMatchesConfiguredUser(
+    { data: { user: { id: "123", urlname: "owner" } } },
+    "owner"
+  );
+  const requests = [];
+  const request = async (endpoint, method) => {
+    requests.push({ endpoint, method });
+    assert.equal(method, "GET");
+    return {
+      data: {
+        contents: [
+          { type: "note", note: { id: 179921781, key: "n318f64f66b50", user: { id: "123", urlname: "owner" } } },
+        ],
+        total_count: 1,
+      },
+    };
+  };
+
+  try {
+    const response = await registerHandlers(request).get("open-note-editor")({ noteId: "179921781" });
+    assert.equal(response.isError, undefined);
+    assert.equal(
+      JSON.parse(response.content[0].text).editUrl,
+      "https://editor.note.com/notes/n318f64f66b50/edit/"
+    );
+    assert.equal(requests.length, 1);
+    assert.match(requests[0].endpoint, /^\/v2\/note_list\/contents\?/);
+  } finally {
+    env.NOTE_USER_ID = originalUserId;
+    setActiveSessionCookie("");
+  }
+});
+
+test("open-note-editor reports an actionable error for an unmapped numeric ID", async () => {
+  const originalUserId = env.NOTE_USER_ID;
+  env.NOTE_USER_ID = "owner";
+  assertCurrentUserMatchesConfiguredUser(
+    { data: { user: { id: "123", urlname: "owner" } } },
+    "owner"
+  );
+
+  try {
+    const response = await registerHandlers(async () => ({ data: { contents: [], total_count: 0 } }))
+      .get("open-note-editor")({ noteId: "404" });
+    assert.equal(response.isError, true);
+    assert.match(response.content[0].text, /note key.*設定ユーザーの一覧/);
   } finally {
     env.NOTE_USER_ID = originalUserId;
     setActiveSessionCookie("");

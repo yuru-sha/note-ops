@@ -14,15 +14,21 @@ import {
   MembershipPlan,
 } from "../types/membership-types.js";
 
+export function noteEditorUrl(noteKey: unknown): string {
+  return `https://editor.note.com/notes/${encodeURIComponent(String(noteKey ?? ""))}/edit/`;
+}
+
 // 記事データのフォーマット
 export function formatNote(
   note: any,
   username?: string,
   includeUserDetails?: boolean,
-  analyzeContent?: boolean
+  analyzeContent?: boolean,
+  fallbackNoteKey?: string
 ): FormattedNote {
   const user = note.user || note.author || {};
   const draft = note.noteDraft || note.note_draft;
+  const noteKey = note.key || fallbackNoteKey || "";
 
   // コンテンツ分析用データの整形
   const hasEyecatch = Boolean(note.eyecatch || note.sp_eyecatch);
@@ -50,7 +56,7 @@ export function formatNote(
 
   return {
     id: note.id || "",
-    key: note.key || "",
+    key: noteKey,
     title: note.name || "",
     body: note.body || draft?.body || "",
     excerpt: note.body
@@ -62,11 +68,11 @@ export function formatNote(
     likesCount: note.likeCount || note.like_count || 0,
     commentsCount: note.commentsCount || note.comment_count || 0,
     user: username || user.nickname || "",
-    url: `https://note.com/${username || user.urlname || "unknown"}/n/${note.key || ""}`,
+    url: `https://note.com/${username || user.urlname || "unknown"}/n/${noteKey}`,
     status: note.status || "",
     isDraft: note.status === "draft",
     format: note.format || "",
-    editUrl: `https://note.com/${username || user.urlname || "unknown"}/n/${note.key || ""}/edit`,
+    editUrl: noteEditorUrl(noteKey),
     hasDraftContent: Boolean(draft),
     lastUpdated: draft?.updatedAt || draft?.updated_at || note.createdAt || "",
 
