@@ -31,7 +31,7 @@ The default server exposes exactly these tools:
 
 - `get-my-notes` requires `NOTE_USER_ID` and supports `all`, `draft`, and `public` filters.
 - `get-note` accepts a note ID or key and includes draft content when note.com returns it. Numeric IDs are resolved through the authenticated user's note list, and the detail endpoint is called with the returned note key.
-- `post-draft-note` accepts Markdown or HTML. Markdown is converted to note.com HTML; already-HTML input is preserved.
+- `post-draft-note` accepts Markdown or HTML. Markdown is converted to note.com HTML; already-HTML input is preserved. KaTeX display blocks delimited by `$$` on their own lines retain their delimiters and line breaks without an enclosing HTML paragraph.
 - `post-draft-note` returns the note key from the create response or the authenticated draft list when note.com omits it; it does not fabricate a key from the numeric ID.
 - `edit-note` resolves note keys when necessary and always uses the draft-save path.
 - `set-note-eyecatch` accepts a local PNG, JPEG, GIF, or WebP file up to 10 MB, validates it before the request, and uses note.com's eyecatch upload endpoint for the configured user's own draft with ownership checks.

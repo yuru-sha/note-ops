@@ -80,6 +80,14 @@ export function convertMarkdownToHtml(markdown: string): string {
     return `__CODE_BLOCK_${index}__`;
   });
 
+  // KaTeX表示ブロックを段落分割・インライン変換から保護
+  const displayMathBlocks: string[] = [];
+  text = text.replace(/^[ \t]*\$\$[ \t]*\n([\s\S]*?)\n^[ \t]*\$\$[ \t]*$/gm, (match) => {
+    const index = displayMathBlocks.length;
+    displayMathBlocks.push(match.split("\n").join("<br>"));
+    return `__DISPLAY_MATH_${index}__`;
+  });
+
   // インラインコードを一時的にプレースホルダーに置換
   const inlineCodes: string[] = [];
   text = text.replace(/`([^`\n]+)`/g, (match, code) => {
@@ -120,8 +128,16 @@ export function convertMarkdownToHtml(markdown: string): string {
 
         if (!trimmedLine) continue;
 
-        // コードブロックプレースホルダー
-        if (trimmedLine.match(/^__CODE_BLOCK_\d+__$/)) {
+        // コード・KaTeX表示ブロックのプレースホルダー
+        const blockMatch = trimmedLine.match(/^__(CODE_BLOCK|DISPLAY_MATH)_(\d+)__$/);
+        if (blockMatch) {
+          const index = Number(blockMatch[2]);
+          const block =
+            blockMatch[1] === "CODE_BLOCK" ? codeBlocks[index] : displayMathBlocks[index];
+          if (block === undefined) {
+            result.push(`<p>${processInline(trimmedLine)}</p>`);
+            continue;
+          }
           if (inList) {
             result.push(
               `<${inList}>${listItems.map((item) => `<li>${item}</li>`).join("")}</${inList}>`
@@ -134,8 +150,7 @@ export function convertMarkdownToHtml(markdown: string): string {
             blockquoteLines = [];
             inBlockquote = false;
           }
-          const index = parseInt(trimmedLine.match(/\d+/)![0]);
-          result.push(codeBlocks[index]);
+          result.push(block);
           continue;
         }
 

@@ -333,6 +333,27 @@ test("Markdown is converted without double-wrapping HTML", () => {
   assert.match(richHtml, /<a href="https:\/\/example\.com"[^>]*>docs<\/a>/);
 });
 
+test("KaTeX display blocks keep delimiters and line breaks outside paragraphs", () => {
+  const html = convertMarkdownToNoteHtml(`$$
+\\begin{array}{lrr}
+\\text{項目} & \\text{レンズA} & \\text{レンズB} \\\\
+\\hline
+\\text{質量} & 994\\,\\mathrm{g} & 995\\,\\mathrm{g}
+\\end{array}
+$$`);
+
+  assert.equal(
+    html,
+    "$$<br>\\begin{array}{lrr}<br>\\text{項目} & \\text{レンズA} & \\text{レンズB} \\\\<br>\\hline<br>\\text{質量} & 994\\,\\mathrm{g} & 995\\,\\mathrm{g}<br>\\end{array}<br>$$"
+  );
+
+  const surroundedHtml = convertMarkdownToNoteHtml("intro\n$$\nx + y\n$$\nend");
+  assert.match(surroundedHtml, /<p[^>]*>intro<\/p>\$\$<br>x \+ y<br>\$\$<p[^>]*>end<\/p>/);
+
+  const placeholderLikeText = convertMarkdownToNoteHtml("__DISPLAY_MATH_0__");
+  assert.match(placeholderLikeText, /<p[^>]*>__DISPLAY_MATH_0__<\/p>/);
+});
+
 test("Draft responses preserve note.com keys", () => {
   assert.equal(draftNoteKey("179921781", "n318f64f66b50"), "n318f64f66b50");
   assert.equal(draftNoteKey("123"), "n123");
