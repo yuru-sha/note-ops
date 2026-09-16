@@ -18,6 +18,17 @@ revise one note.com article. The MCP server remains the execution boundary.
 If the target or intended action is ambiguous, ask before reading or writing.
 Do not invent missing source material, title requirements, or tags.
 
+## Eyecatch dimensions
+
+For a note article eyecatch, normalize the local image to exactly 1280x670 px
+(1.91:1) before calling `set-note-eyecatch`. Verify the local pixel dimensions;
+do not treat note.com's post-upload rendition as proof that the source image
+was correctly sized. Keep important text and subjects inside the central safe
+band because list and thumbnail views may crop the top and bottom.
+
+The tool accepts the image formats and 10 MB limit defined in `SPEC.md`, but
+format and file size validation do not guarantee the required pixel dimensions.
+
 ## Math and comparison tables
 
 When an article needs a formula or a comparison table, use note's TeX/KaTeX
