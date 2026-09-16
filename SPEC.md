@@ -35,7 +35,7 @@ The default server exposes exactly these tools:
 - `post-draft-note` returns the note key from the create response or the authenticated draft list when note.com omits it; it does not fabricate a key from the numeric ID.
 - `edit-note` resolves note keys when necessary and always uses the draft-save path.
 - `set-note-eyecatch` accepts a local PNG, JPEG, GIF, or WebP file up to 10 MB, validates it before the request, and uses note.com's eyecatch upload endpoint for the configured user's own draft with ownership checks.
-- `open-note-editor` requires `NOTE_USER_ID` and returns an editor URL.
+- `open-note-editor` requires `NOTE_USER_ID`, resolves numeric IDs through the authenticated user's note list, and returns a canonical `https://editor.note.com/notes/<note-key>/edit/` URL.
 - Note IDs and keys are URL-encoded before API or URL construction.
 - API errors are returned as MCP error responses with actionable, non-secret messages.
 
@@ -51,7 +51,7 @@ NOTE_XSRF_TOKEN=your_xsrf_token
 
 `NOTE_EMAIL` and `NOTE_PASSWORD` provide the optional direct-login path. Authentication is resolved lazily when an authenticated API call is made. Session cookies, XSRF tokens, passwords, and full response bodies stay out of logs and MCP responses.
 
-Authenticated operations require `NOTE_USER_ID` and an authentication source: `NOTE_SESSION_V5`, `NOTE_ALL_COOKIES`, or `NOTE_EMAIL` plus `NOTE_PASSWORD`. Draft and eyecatch writes include an XSRF token from `NOTE_XSRF_TOKEN` or the authenticated session response when available. The note.com API may reject a write without it. When `NOTE_ALL_COOKIES` and `NOTE_LIVE_DRAFT_TESTS=true` are used, the live draft smoke preflight requires `NOTE_XSRF_TOKEN`. `open-note-editor` only builds a URL and requires `NOTE_USER_ID`; it does not make an authenticated API call.
+Authenticated operations require `NOTE_USER_ID` and an authentication source: `NOTE_SESSION_V5`, `NOTE_ALL_COOKIES`, or `NOTE_EMAIL` plus `NOTE_PASSWORD`. Draft and eyecatch writes include an XSRF token from `NOTE_XSRF_TOKEN` or the authenticated session response when available. The note.com API may reject a write without it. When `NOTE_ALL_COOKIES` and `NOTE_LIVE_DRAFT_TESTS=true` are used, the live draft smoke preflight requires `NOTE_XSRF_TOKEN`. `open-note-editor` accepts a note key directly, but numeric IDs require an authenticated note-list lookup to resolve the note key. It fails closed when the numeric ID cannot be resolved or ownership cannot be verified.
 
 Before any authenticated list, read, create-draft, or edit-draft operation, the server resolves `current_user` and requires its `id` or `urlname` to match `NOTE_USER_ID`. If the identity is unavailable or mismatched, the operation fails closed with a redacted diagnostic. This check applies to session cookies, `NOTE_ALL_COOKIES`, and the optional email/password login path.
 

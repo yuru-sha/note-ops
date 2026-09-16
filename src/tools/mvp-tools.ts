@@ -15,7 +15,7 @@ import {
   handleApiError,
 } from "../utils/error-handler.js";
 import { convertMarkdownToNoteHtml, looksLikeHtml } from "../utils/markdown-converter.js";
-import { formatNote } from "../utils/formatters.js";
+import { formatNote, noteEditorUrl } from "../utils/formatters.js";
 import {
   extractNotePayload,
   normalizeNoteListResponse,
@@ -321,7 +321,10 @@ export function registerMvpTools(server: McpServer, request: NoteApiRequest = no
         const formatted = notes.map((note: any) => {
           const draft = note.noteDraft || note.note_draft;
           const body = note.body || draft?.body || "";
-          const key = note.key || "";
+          const key =
+            note.key ||
+            noteKeyForId(notes, String(note.id || note.note_id || note.noteId || "")) ||
+            "";
           const encodedKey = encodeURIComponent(key || note.id || "");
           return {
             id: String(note.id || ""),
@@ -332,7 +335,7 @@ export function registerMvpTools(server: McpServer, request: NoteApiRequest = no
             isDraft: isDraftNote(note),
             publishedAt: note.publishAt || note.publish_at || note.createdAt || "",
             url: `https://note.com/${encodeURIComponent(env.NOTE_USER_ID)}/n/${encodedKey}`,
-            editUrl: `https://editor.note.com/notes/${encodedKey}/edit/`,
+            ...(key ? { editUrl: noteEditorUrl(key) } : {}),
           };
         });
 
@@ -362,7 +365,7 @@ export function registerMvpTools(server: McpServer, request: NoteApiRequest = no
         const note = extractNotePayload(result);
         ensureNoteOwnership(note);
         return createSuccessResponse(
-          formatNote(note, note.user?.urlname || env.NOTE_USER_ID, true, true)
+          formatNote(note, note.user?.urlname || env.NOTE_USER_ID, true, true, noteReference)
         );
       } catch (error) {
         return handleApiError(error, "記事取得");
@@ -409,7 +412,7 @@ export function registerMvpTools(server: McpServer, request: NoteApiRequest = no
           success: true,
           noteId: id,
           noteKey,
-          editUrl: `https://editor.note.com/notes/${encodeURIComponent(noteKey)}/edit/`,
+          editUrl: noteEditorUrl(noteKey),
         });
       } catch (error) {
         return handleApiError(error, "記事下書き保存");
@@ -488,10 +491,15 @@ export function registerMvpTools(server: McpServer, request: NoteApiRequest = no
     "記事の編集ページURLを生成する",
     { noteId: z.string().min(1).describe("記事IDまたは記事キー") },
     async ({ noteId }) => {
-      if (!env.NOTE_USER_ID) return createErrorResponse("環境変数 NOTE_USER_ID が設定されていません。");
-      return createSuccessResponse({
-        editUrl: `https://editor.note.com/notes/${encodeURIComponent(noteId)}/edit/`,
-      });
+      try {
+        if (!env.NOTE_USER_ID) return createErrorResponse("環境変数 NOTE_USER_ID が設定されていません。");
+        const noteKey = /^\d+$/.test(noteId)
+          ? await resolveNoteKey(noteId, "all", request)
+          : noteId;
+        return createSuccessResponse({ editUrl: noteEditorUrl(noteKey) });
+      } catch (error) {
+        return handleApiError(error, "記事編集URL生成");
+      }
     }
   );
 }
