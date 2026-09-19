@@ -31,9 +31,10 @@ export function hasLiveSmokeAuthentication(environment: LiveSmokeEnvironment): b
 export function hasConfiguredUserOwnership(note: unknown, userId: string): boolean {
   if (!note || typeof note !== "object") return false;
   const author = (note as { author?: { id?: unknown; urlname?: unknown } }).author;
-  return [author?.id, author?.urlname].some(
-    (identifier) => String(identifier ?? "") === userId
+  const identifiers = [author?.id, author?.urlname].filter(
+    (identifier) => identifier !== undefined && identifier !== null && String(identifier) !== ""
   );
+  return identifiers.length > 0 && identifiers.every((identifier) => String(identifier) === userId);
 }
 
 export function hasUnpublishedDraft(notes: unknown, noteId: string): boolean {

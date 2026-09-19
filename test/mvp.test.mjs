@@ -316,6 +316,10 @@ test("Live draft verification requires the created note in the draft list", () =
 test("Live article verification requires the configured user as author", () => {
   assert.equal(hasConfiguredUserOwnership({ author: { urlname: "owner" } }, "owner"), true);
   assert.equal(hasConfiguredUserOwnership({ author: { id: "123" } }, "123"), true);
+  assert.equal(
+    hasConfiguredUserOwnership({ author: { id: "owner", urlname: "other" } }, "owner"),
+    false
+  );
   assert.equal(hasConfiguredUserOwnership({ author: { urlname: "other" } }, "owner"), false);
   assert.equal(hasConfiguredUserOwnership({}, "owner"), false);
 });
