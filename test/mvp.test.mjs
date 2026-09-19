@@ -11,6 +11,7 @@ import {
   draftNoteKey,
   eyecatchMimeType,
   assertEyecatchContents,
+  assertEyecatchDimensions,
   isDraftNote,
   noteKeyFromPayload,
   noteKeyFromCreateResponse,
@@ -98,7 +99,9 @@ test("project instructions match the six-tool MVP contract", () => {
 test("eyecatch documentation makes the draft-only boundary explicit", () => {
   assert.match(readme, /`set-note-eyecatch`[^\n]*自分の下書き[^\n]*タイトル画像/);
   assert.match(readme, /タイトル画像は、認証済みの自分の下書きに対して/);
+  assert.match(readme, /1280x670px/);
   assert.match(spec, /\| `set-note-eyecatch` \| .*configured user's own draft.* \| Draft metadata update \|/i);
+  assert.match(spec, /actual 1280x670 pixel dimensions/i);
   assert.match(
     workflowSkill,
     /5\.\s+If an eyecatch image is requested for the configured user's own draft,\s+use\s+`set-note-eyecatch` after the draft\s+exists\./i
@@ -151,7 +154,7 @@ test("API requests replace case-insensitive multipart headers and retain JSON de
 test("Eyecatch handler keeps ownership, draft, and XSRF guards before upload", async () => {
   const originalUserId = env.NOTE_USER_ID;
   const originalXsrfToken = env.NOTE_XSRF_TOKEN;
-  const imagePath = join(repositoryRoot, "test-articles/images/test-image.png");
+  const imagePath = join(repositoryRoot, "test-articles/images/test-image-1280x670.png");
   const uploadEndpoints = [];
   const fetchRequests = [];
   const fetcher = async (_url, options) => {
@@ -221,6 +224,15 @@ test("Eyecatch validation accepts supported formats and rejects unsafe sizes", (
   assert.equal(isDraftNote({ noteDraft: {} }), true);
   assert.equal(isDraftNote({ status: "published" }), false);
   assert.equal(isDraftNote({}), false);
+});
+
+test("Eyecatch validation requires the documented source dimensions", () => {
+  const validImage = readFileSync(
+    join(repositoryRoot, "test-articles/images/test-image-1280x670.png")
+  );
+  const mismatchedImage = readFileSync(join(repositoryRoot, "test-articles/images/test-image.png"));
+  assert.doesNotThrow(() => assertEyecatchDimensions(validImage, "image/png"));
+  assert.throws(() => assertEyecatchDimensions(mismatchedImage, "image/png"), /1280.*670/);
 });
 
 test("note workflow skill documents the safe six-tool contract", () => {
