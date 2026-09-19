@@ -13,7 +13,7 @@ import { getActiveXsrfToken } from "../build/utils/auth.js";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const testEyecatchPath = fileURLToPath(
-  new URL("../test-articles/images/test-image.png", import.meta.url)
+  new URL("../test-articles/images/test-image-1280x670.png", import.meta.url)
 );
 
 function registerHandlers() {
