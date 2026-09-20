@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { runLiveSmoke } from "./live-smoke.mjs";
-import { resolveXsrfToken } from "../build/utils/auth.js";
+import {
+  assertCurrentUserMatchesConfiguredUser,
+  resolveXsrfToken,
+} from "../build/utils/auth.js";
 
 const readEnvironment = {
   NOTE_LIVE_TESTS: "true",
@@ -16,11 +19,16 @@ test("live smoke allows session-only credentials through read checks", async () 
   await runLiveSmoke({
     environment: readEnvironment,
     configuredUserId: "owner",
-    verifiedUserIdentifiers: ["123", "owner"],
     getXsrfToken: () => null,
     invokeOperation: async (name, input) => {
       calls.push([name, input]);
-      if (name === "get-my-notes") return { notes: [] };
+      if (name === "get-my-notes") {
+        assertCurrentUserMatchesConfiguredUser(
+          { data: { user: { id: "123", urlname: "owner" } } },
+          "owner"
+        );
+        return { notes: [] };
+      }
       return { id: "note-1", author: { id: "123", urlname: "owner" } };
     },
   });
