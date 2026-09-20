@@ -19,8 +19,17 @@ export function noteOwnership(
   trustedUserIdentifiers?: readonly string[]
 ): boolean | "unknown" {
   if (!userId) return "unknown";
-  const user = note?.user || note?.author || {};
-  const identifiers = [user.urlname, user.id, note?.user_id, note?.userId].filter(Boolean);
+  // A formatted note's `user` may be a display/fallback string, not ownership evidence.
+  const user = typeof note?.user === "object" && note.user ? note.user : {};
+  const author = typeof note?.author === "object" && note.author ? note.author : {};
+  const identifiers = [
+    user.urlname,
+    user.id,
+    author.urlname,
+    author.id,
+    note?.user_id,
+    note?.userId,
+  ].filter(Boolean);
   if (identifiers.length === 0) return "unknown";
   if (!trustedUserIdentifiers) return identifiers.some((value) => String(value) === userId);
   const trusted = new Set(trustedUserIdentifiers.map(String));
