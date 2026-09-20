@@ -72,6 +72,114 @@ export function assertEyecatchContents(contents: Uint8Array, mimeType: string): 
   if (!valid) throw new Error("アイキャッチの内容が拡張子と一致しません。");
 }
 
+function uint16BE(contents: Uint8Array, offset: number): number {
+  return (contents[offset] << 8) | contents[offset + 1];
+}
+
+function uint16LE(contents: Uint8Array, offset: number): number {
+  return contents[offset] | (contents[offset + 1] << 8);
+}
+
+function uint24LE(contents: Uint8Array, offset: number): number {
+  return contents[offset] | (contents[offset + 1] << 8) | (contents[offset + 2] << 16);
+}
+
+function jpegDimensions(contents: Uint8Array): { width: number; height: number } | null {
+  let offset = 2;
+  while (offset < contents.length) {
+    if (contents[offset] !== 0xff) return null;
+    while (contents[offset] === 0xff) offset += 1;
+    const marker = contents[offset++];
+    if (marker >= 0xd0 && marker <= 0xd9) continue;
+    if (marker === 0xda || offset + 1 >= contents.length) return null;
+    const segmentLength = uint16BE(contents, offset);
+    if (segmentLength < 2 || offset + segmentLength > contents.length) return null;
+    const isSof =
+      (marker >= 0xc0 && marker <= 0xc3) ||
+      (marker >= 0xc5 && marker <= 0xc7) ||
+      (marker >= 0xc9 && marker <= 0xcb) ||
+      (marker >= 0xcd && marker <= 0xcf);
+    if (isSof && segmentLength >= 7) {
+      return { height: uint16BE(contents, offset + 3), width: uint16BE(contents, offset + 5) };
+    }
+    offset += segmentLength;
+  }
+  return null;
+}
+
+function webpDimensions(contents: Uint8Array): { width: number; height: number } | null {
+  if (contents.length < 20 || !startsWithBytes(contents, [0x52, 0x49, 0x46, 0x46])) {
+    return null;
+  }
+  if (!startsWithBytes(contents.subarray(8), [0x57, 0x45, 0x42, 0x50])) return null;
+  if (startsWithBytes(contents.subarray(12), [0x56, 0x50, 0x38, 0x20])) {
+    if (contents.length < 30 || !startsWithBytes(contents.subarray(23), [0x9d, 0x01, 0x2a])) {
+      return null;
+    }
+    return {
+      width: uint16LE(contents, 26) & 0x3fff,
+      height: uint16LE(contents, 28) & 0x3fff,
+    };
+  }
+  if (startsWithBytes(contents.subarray(12), [0x56, 0x50, 0x38, 0x4c])) {
+    if (contents.length < 25 || contents[20] !== 0x2f) return null;
+    const bits = contents.slice(21, 25);
+    return {
+      width: 1 + (bits[0] | ((bits[1] & 0x3f) << 8)),
+      height: 1 + ((bits[1] >> 6) | (bits[2] << 2) | ((bits[3] & 0x0f) << 10)),
+    };
+  }
+  if (startsWithBytes(contents.subarray(12), [0x56, 0x50, 0x38, 0x58])) {
+    if (contents.length < 30) return null;
+    return { width: 1 + uint24LE(contents, 24), height: 1 + uint24LE(contents, 27) };
+  }
+  return null;
+}
+
+function pngDimensions(contents: Uint8Array): { width: number; height: number } | null {
+  if (
+    contents.length < 33 ||
+    uint32BE(contents, 8) !== 13 ||
+    !startsWithBytes(contents.subarray(12), [0x49, 0x48, 0x44, 0x52])
+  ) {
+    return null;
+  }
+  return { width: uint32BE(contents, 16), height: uint32BE(contents, 20) };
+}
+
+function eyecatchDimensions(
+  contents: Uint8Array,
+  mimeType: string
+): { width: number; height: number } | null {
+  if (mimeType === "image/png") {
+    return pngDimensions(contents);
+  }
+  if (mimeType === "image/jpeg") return contents.length >= 2 ? jpegDimensions(contents) : null;
+  if (mimeType === "image/gif") {
+    return contents.length >= 10
+      ? { width: uint16LE(contents, 6), height: uint16LE(contents, 8) }
+      : null;
+  }
+  if (mimeType === "image/webp") return webpDimensions(contents);
+  return null;
+}
+
+function uint32BE(contents: Uint8Array, offset: number): number {
+  return (
+    contents[offset] * 0x1000000 +
+    (contents[offset + 1] << 16) +
+    (contents[offset + 2] << 8) +
+    contents[offset + 3]
+  );
+}
+
+export function assertEyecatchDimensions(contents: Uint8Array, mimeType: string): void {
+  const dimensions = eyecatchDimensions(contents, mimeType);
+  if (dimensions?.width !== EYECATCH_WIDTH || dimensions.height !== EYECATCH_HEIGHT) {
+    throw new Error("アイキャッチは1280x670pxの画像にしてください。");
+  }
+}
+
 export function buildEyecatchFormData(
   noteId: string,
   fileName: string,
@@ -457,6 +565,7 @@ export function registerMvpTools(server: McpServer, request: NoteApiRequest = no
         const contents = await readFile(imagePath);
         assertEyecatchSize(contents.byteLength);
         assertEyecatchContents(contents, mimeType);
+        assertEyecatchDimensions(contents, mimeType);
         const { id, key, isDraft } = await resolveNoteReference(noteId, request);
         if (!isDraft) throw new Error("指定された記事が下書きではないため、アイキャッチ設定を中止しました。");
         if (!buildAuthHeaders()["X-XSRF-TOKEN"]) {

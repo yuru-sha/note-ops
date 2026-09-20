@@ -31,7 +31,7 @@ npm start
 | `set-note-eyecatch` | 自分の下書きにローカル画像をタイトル画像として設定 | 下書きメタデータ更新 |
 | `open-note-editor` | 編集URL生成 | 読み取り |
 
-公開、コメント、スキ、本文画像のアップロード、検索、Notion、Obsidian、HTTP/n8n、ブラウザ自動化はMVPの対象外です。公開操作はnote.comから行ってください。タイトル画像は、認証済みの自分の下書きに対して、PNG/JPEG/GIF/WebPのローカルファイル（10MB以下）だけを設定できます。公開済み記事には設定できません。`post-draft-note` は note.com の create response、または認証済み下書き一覧から実際の note key を返します。
+公開、コメント、スキ、本文画像のアップロード、検索、Notion、Obsidian、HTTP/n8n、ブラウザ自動化はMVPの対象外です。公開操作はnote.comから行ってください。タイトル画像は、認証済みの自分の下書きに対して、実寸1280x670pxのPNG/JPEG/GIF/WebPローカルファイル（10MB以下）だけを設定できます。公開済み記事には設定できません。`post-draft-note` は note.com の create response、または認証済み下書き一覧から実際の note key を返します。
 
 ## MCPクライアント設定例
 
