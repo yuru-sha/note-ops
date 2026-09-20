@@ -9,7 +9,7 @@ import {
 import { env } from "../build/config/environment.js";
 import { registerMvpTools } from "../build/tools/mvp-tools.js";
 import { redactSensitiveValues } from "../build/utils/safe-logging.js";
-import { getActiveXsrfToken } from "../build/utils/auth.js";
+import { getActiveXsrfToken, getVerifiedConfiguredUserIdentifiers } from "../build/utils/auth.js";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const testEyecatchPath = fileURLToPath(
@@ -47,6 +47,7 @@ export async function runLiveSmoke({
   configuredUserId,
   invokeOperation,
   getXsrfToken = getActiveXsrfToken,
+  verifiedUserIdentifiers,
 } = {}) {
   const userId = configuredUserId || environment.NOTE_USER_ID;
   if (!userId) {
@@ -74,11 +75,13 @@ export async function runLiveSmoke({
   if (!Array.isArray(list.notes)) {
     throw new Error("The article list response did not contain a notes array.");
   }
+  const trustedUserIdentifiers =
+    verifiedUserIdentifiers || getVerifiedConfiguredUserIdentifiers();
 
   const detail = await step("article detail", () =>
     invokeOperation("get-note", { noteId: environment.NOTE_LIVE_NOTE_ID })
   );
-  if (!hasConfiguredUserOwnership(detail, userId)) {
+  if (!hasConfiguredUserOwnership(detail, userId, trustedUserIdentifiers)) {
     throw new Error("The article detail is not owned by NOTE_USER_ID.");
   }
   console.log("Authenticated identity and configured-user ownership checks passed.");

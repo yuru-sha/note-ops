@@ -1,3 +1,5 @@
+import { noteOwnership } from "./note-normalizers.js";
+
 type LiveSmokeEnvironment = {
   NOTE_LIVE_TESTS?: string;
   NOTE_LIVE_DRAFT_TESTS?: string;
@@ -28,12 +30,12 @@ export function hasLiveSmokeAuthentication(environment: LiveSmokeEnvironment): b
   );
 }
 
-export function hasConfiguredUserOwnership(note: unknown, userId: string): boolean {
-  if (!note || typeof note !== "object") return false;
-  const author = (note as { author?: { id?: unknown; urlname?: unknown } }).author;
-  return [author?.id, author?.urlname].some(
-    (identifier) => String(identifier ?? "") === userId
-  );
+export function hasConfiguredUserOwnership(
+  note: unknown,
+  userId: string,
+  trustedUserIdentifiers?: readonly string[]
+): boolean {
+  return noteOwnership(note, userId, trustedUserIdentifiers || [userId]) === true;
 }
 
 export function hasUnpublishedDraft(notes: unknown, noteId: string): boolean {
