@@ -69,6 +69,55 @@ const workflowSkill = readFileSync(
   "utf8"
 );
 
+function pngHeader(width, height) {
+  const header = Buffer.alloc(33);
+  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(header);
+  header.writeUInt32BE(13, 8);
+  header.write("IHDR", 12, "ascii");
+  header.writeUInt32BE(width, 16);
+  header.writeUInt32BE(height, 20);
+  return header;
+}
+
+function jpegHeader(width, height) {
+  const header = Buffer.from([0xff, 0xd8, 0xff, 0xc0, 0x00, 0x07, 0x08, 0x00, 0x00, 0x00, 0x00]);
+  header.writeUInt16BE(height, 7);
+  header.writeUInt16BE(width, 9);
+  return header;
+}
+
+function gifHeader(width, height) {
+  const header = Buffer.alloc(10);
+  header.write("GIF89a", 0, "ascii");
+  header.writeUInt16LE(width, 6);
+  header.writeUInt16LE(height, 8);
+  return header;
+}
+
+function webpHeader(kind, width, height) {
+  const header = Buffer.alloc(kind === "VP8 " ? 30 : kind === "VP8L" ? 25 : 30);
+  header.write("RIFF", 0, "ascii");
+  header.write("WEBP", 8, "ascii");
+  header.write(kind, 12, "ascii");
+  if (kind === "VP8 ") {
+    header.set([0x9d, 0x01, 0x2a], 23);
+    header.writeUInt16LE(width, 26);
+    header.writeUInt16LE(height, 28);
+  } else if (kind === "VP8L") {
+    const encodedWidth = width - 1;
+    const encodedHeight = height - 1;
+    header[20] = 0x2f;
+    header[21] = encodedWidth & 0xff;
+    header[22] = ((encodedWidth >> 8) & 0x3f) | ((encodedHeight & 0x03) << 6);
+    header[23] = (encodedHeight >> 2) & 0xff;
+    header[24] = (encodedHeight >> 10) & 0x0f;
+  } else {
+    header.writeUIntLE(width - 1, 24, 3);
+    header.writeUIntLE(height - 1, 27, 3);
+  }
+  return header;
+}
+
 test("MVP exposes only note management tools", () => {
   assert.deepEqual([...MVP_TOOL_NAMES], [
     "get-my-notes",
@@ -233,6 +282,24 @@ test("Eyecatch validation requires the documented source dimensions", () => {
   const mismatchedImage = readFileSync(join(repositoryRoot, "test-articles/images/test-image.png"));
   assert.doesNotThrow(() => assertEyecatchDimensions(validImage, "image/png"));
   assert.throws(() => assertEyecatchDimensions(mismatchedImage, "image/png"), /1280.*670/);
+
+  const forgedPng = Buffer.alloc(24);
+  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(forgedPng);
+  forgedPng.writeUInt32BE(1280, 16);
+  forgedPng.writeUInt32BE(670, 20);
+  assert.throws(() => assertEyecatchDimensions(forgedPng, "image/png"), /1280.*670/);
+
+  for (const [mimeType, valid, mismatched] of [
+    ["image/jpeg", jpegHeader(1280, 670), jpegHeader(1279, 670)],
+    ["image/gif", gifHeader(1280, 670), gifHeader(1279, 670)],
+    ["image/webp", webpHeader("VP8 ", 1280, 670), webpHeader("VP8 ", 1279, 670)],
+    ["image/webp", webpHeader("VP8L", 1280, 670), webpHeader("VP8L", 1279, 670)],
+    ["image/webp", webpHeader("VP8X", 1280, 670), webpHeader("VP8X", 1279, 670)],
+  ]) {
+    assert.doesNotThrow(() => assertEyecatchContents(valid, mimeType));
+    assert.doesNotThrow(() => assertEyecatchDimensions(valid, mimeType));
+    assert.throws(() => assertEyecatchDimensions(mismatched, mimeType), /1280.*670/);
+  }
 });
 
 test("note workflow skill documents the safe six-tool contract", () => {

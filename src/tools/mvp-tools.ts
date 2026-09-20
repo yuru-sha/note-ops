@@ -136,14 +136,23 @@ function webpDimensions(contents: Uint8Array): { width: number; height: number }
   return null;
 }
 
+function pngDimensions(contents: Uint8Array): { width: number; height: number } | null {
+  if (
+    contents.length < 33 ||
+    uint32BE(contents, 8) !== 13 ||
+    !startsWithBytes(contents.subarray(12), [0x49, 0x48, 0x44, 0x52])
+  ) {
+    return null;
+  }
+  return { width: uint32BE(contents, 16), height: uint32BE(contents, 20) };
+}
+
 function eyecatchDimensions(
   contents: Uint8Array,
   mimeType: string
 ): { width: number; height: number } | null {
   if (mimeType === "image/png") {
-    return contents.length >= 24
-      ? { width: uint32BE(contents, 16), height: uint32BE(contents, 20) }
-      : null;
+    return pngDimensions(contents);
   }
   if (mimeType === "image/jpeg") return contents.length >= 2 ? jpegDimensions(contents) : null;
   if (mimeType === "image/gif") {
