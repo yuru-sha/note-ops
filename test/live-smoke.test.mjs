@@ -16,11 +16,12 @@ test("live smoke allows session-only credentials through read checks", async () 
   await runLiveSmoke({
     environment: readEnvironment,
     configuredUserId: "owner",
+    verifiedUserIdentifiers: ["123", "owner"],
     getXsrfToken: () => null,
     invokeOperation: async (name, input) => {
       calls.push([name, input]);
       if (name === "get-my-notes") return { notes: [] };
-      return { id: "note-1", author: { id: "owner" } };
+      return { id: "note-1", author: { id: "123", urlname: "owner" } };
     },
   });
 
@@ -40,6 +41,7 @@ test("live smoke uses an XSRF token captured during authenticated reads before w
       NOTE_LIVE_DRAFT_TESTS: "true",
     },
     configuredUserId: "owner",
+    verifiedUserIdentifiers: ["owner"],
     getXsrfToken: () => capturedXsrfToken,
     invokeOperation: async (name, input) => {
       calls.push([name, input]);
@@ -72,6 +74,7 @@ test("live smoke stops before draft writes without a configured or captured XSRF
         NOTE_LIVE_EYECATCH_TESTS: "true",
       },
       configuredUserId: "owner",
+      verifiedUserIdentifiers: ["owner"],
       getXsrfToken: () => null,
       invokeOperation: async (name, input) => {
         calls.push([name, input]);
