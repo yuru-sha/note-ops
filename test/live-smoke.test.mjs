@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { runLiveSmoke } from "./live-smoke.mjs";
+import { formatNote } from "../build/utils/formatters.js";
 import {
   assertCurrentUserMatchesConfiguredUser,
   resolveXsrfToken,
@@ -36,6 +37,31 @@ test("live smoke allows session-only credentials through read checks", async () 
   assert.deepEqual(
     calls.map(([name]) => name),
     ["get-my-notes", "get-note"]
+  );
+});
+
+test("live smoke verifies ownership from the formatted get-note response", async () => {
+  const runWithDetail = (detail) =>
+    runLiveSmoke({
+      environment: readEnvironment,
+      configuredUserId: "owner",
+      verifiedUserIdentifiers: ["123", "owner"],
+      invokeOperation: async (name) =>
+        name === "get-my-notes" ? { notes: [] } : detail,
+    });
+
+  await runWithDetail(
+    formatNote({ author: { id: "123", urlname: "owner" } }, "owner", true, true, "note-1")
+  );
+  await assert.rejects(
+    runWithDetail(
+      formatNote({ author: { id: "123", urlname: "other" } }, "owner", true, true, "note-1")
+    ),
+    /article detail is not owned by NOTE_USER_ID/
+  );
+  await assert.rejects(
+    runWithDetail(formatNote({}, "owner", true, true, "note-1")),
+    /article detail is not owned by NOTE_USER_ID/
   );
 });
 
