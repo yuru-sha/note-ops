@@ -63,6 +63,7 @@ function registerHandlers(request) {
 const repositoryRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const agentInstructions = readFileSync(join(repositoryRoot, "AGENTS.md"), "utf8");
 const readme = readFileSync(join(repositoryRoot, "README.md"), "utf8");
+const readmeJa = readFileSync(join(repositoryRoot, "README.ja.md"), "utf8");
 const spec = readFileSync(join(repositoryRoot, "SPEC.md"), "utf8");
 const workflowSkill = readFileSync(
   join(repositoryRoot, "skills/note-management-workflow/SKILL.md"),
@@ -146,16 +147,21 @@ test("project instructions match the six-tool MVP contract", () => {
 });
 
 test("eyecatch documentation makes the draft-only boundary explicit", () => {
-  assert.match(readme, /`set-note-eyecatch`[^\n]*自分の下書き[^\n]*タイトル画像/);
-  assert.match(readme, /タイトル画像は、認証済みの自分の下書きに対して/);
-  assert.match(readme, /1280x670px/);
+  assert.match(readmeJa, /`set-note-eyecatch`[^\n]*自分の下書き[^\n]*タイトル画像/);
+  assert.match(readmeJa, /タイトル画像は、認証済みの自分の下書きに対して/);
+  assert.match(readmeJa, /1280x670px/);
+  assert.match(
+    readme,
+    /`set-note-eyecatch` \| Set a local image as the title image for my draft \| Update draft metadata \|/
+  );
+  assert.match(readme, /actual dimensions of 1280x670 pixels/);
   assert.match(spec, /\| `set-note-eyecatch` \| .*configured user's own draft.* \| Draft metadata update \|/i);
   assert.match(spec, /actual 1280x670 pixel dimensions/i);
   assert.match(
     workflowSkill,
     /5\.\s+If an eyecatch image is requested for the configured user's own draft,\s+use\s+`set-note-eyecatch` after the draft\s+exists\./i
   );
-  assert.doesNotMatch(readme, /タイトル画像は、認証済みの自分の記事に対して/);
+  assert.doesNotMatch(readmeJa, /タイトル画像は、認証済みの自分の記事に対して/);
 });
 
 test("Eyecatch uploads use the note API multipart contract", async () => {
@@ -335,7 +341,7 @@ test("note workflow skill is discoverable from project instructions", () => {
 });
 
 test("documentation states authentication and ownership boundaries", () => {
-  for (const documentation of [readme, spec]) {
+  for (const documentation of [readme, readmeJa, spec]) {
     assert.match(
       documentation,
       /(?:NOTE_USER_ID.*(?:認証情報|authentication source)|(?:認証対象|authenticated operations).*NOTE_USER_ID)/i
@@ -344,7 +350,7 @@ test("documentation states authentication and ownership boundaries", () => {
     assert.match(documentation, /get-note.*(?:所有|ownership)/i);
     assert.match(documentation, /失敗|fails? closed/i);
   }
-  assert.match(readme, /セッション応答のXSRFトークン/);
+  assert.match(readmeJa, /セッション応答のXSRFトークン/);
   assert.match(readme, /NOTE_ALL_COOKIES.*live draft smoke.*NOTE_XSRF_TOKEN/i);
   assert.match(spec, /draft and eyecatch writes include an XSRF token.*when available/i);
 });

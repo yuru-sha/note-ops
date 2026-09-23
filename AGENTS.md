@@ -32,6 +32,11 @@ Read `SPEC.md` before changing code. Treat it as the authoritative contract for 
 
 - For note.com article workflow requests (draft, inspect, revise, or save), read `skills/note-management-workflow/SKILL.md` before using the MCP workflow.
 
+## Commit Messages
+
+- Follow the commit-message policy in `CONTRIBUTING.md`.
+- Do not create commits unless the user explicitly requests it.
+
 ## Git
 
-The agent may edit and verify the working tree. Commits, branches, pushes, and pull requests require an explicit user request.
+The agent may edit and verify the working tree. Branches, pushes, and pull requests require an explicit user request.

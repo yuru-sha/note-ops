@@ -1,11 +1,12 @@
 # note-ops
 
+[English](README.md) | [日本語](README.ja.md)
+
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/yuru-sha/note-ops)
 
-note.comの記事と下書きを管理するための、ローカルstdio MCPサーバーです。
-現在は下書き中心のMVPだけを提供しています。
+A local stdio MCP server for managing note.com articles and drafts. It currently provides only an MVP focused on drafts.
 
-## クイックスタート
+## Quick Start
 
 ```bash
 git clone https://github.com/yuru-sha/note-ops.git
@@ -16,24 +17,24 @@ npm run build
 npm start
 ```
 
-認証対象の一覧取得・詳細取得・下書き作成・下書き編集には、`NOTE_USER_ID` と、既存セッション（`NOTE_SESSION_V5`。下書き操作では `NOTE_XSRF_TOKEN` またはセッション応答のXSRFトークンを使用）、`NOTE_ALL_COOKIES`、または `NOTE_EMAIL` と `NOTE_PASSWORD` の直接ログインを設定します。認証値はコミットせず、ログやMCPレスポンスに出力しないでください。
+To list or read articles, create drafts, or edit drafts, configure `NOTE_USER_ID` and one of the following authentication methods: an existing session (`NOTE_SESSION_V5`; draft operations use `NOTE_XSRF_TOKEN` or the XSRF token from the session response), `NOTE_ALL_COOKIES`, or direct login with `NOTE_EMAIL` and `NOTE_PASSWORD`. Never commit credentials or include them in logs or MCP responses.
 
-認証対象の操作では、note.com の `current_user` と `NOTE_USER_ID` が一致することを事前に確認します。`get-note`、`edit-note`、`set-note-eyecatch` では記事の所有者も確認します。`get-note` に numeric ID を渡した場合は、認証済みユーザーの記事一覧から note key を解決して詳細を取得します。`open-note-editor` も numeric ID の場合は認証済みユーザーの記事一覧から note key を解決し、`https://editor.note.com/notes/<note-key>/edit/` を返します。一致しない、所有者を確認できない、note key を解決できない、または認証に失敗した場合は処理を中止し、秘密情報を含まないエラーを返します。記事キーを直接渡した場合の `open-note-editor` は一覧取得を行いません。
+For authenticated operations, verify in advance that note.com's `current_user` matches `NOTE_USER_ID`. For `get-note`, `edit-note`, and `set-note-eyecatch`, also verify note ownership. When `get-note` receives a numeric ID, it resolves the note key from the authenticated user's note list before fetching details. For a numeric ID, `open-note-editor` also resolves the note key from the authenticated user's note list and returns `https://editor.note.com/notes/<note-key>/edit/`. If identities do not match, ownership cannot be verified, the note key cannot be resolved, or authentication fails, the operation fails closed and returns an error without secret information. When given a note key directly, `open-note-editor` does not fetch the note list.
 
-## MCPツール
+## MCP Tools
 
-| Tool | 用途 | 変更範囲 |
+| Tool | Purpose | Scope |
 |---|---|---|
-| `get-my-notes` | 自分の記事・下書き一覧 | 読み取り |
-| `get-note` | 記事・下書き詳細 | 読み取り |
-| `post-draft-note` | 新規下書き作成・更新 | 下書き保存 |
-| `edit-note` | 既存記事を下書き保存 | 下書き保存 |
-| `set-note-eyecatch` | 自分の下書きにローカル画像をタイトル画像として設定 | 下書きメタデータ更新 |
-| `open-note-editor` | 編集URL生成 | 読み取り |
+| `get-my-notes` | List my articles and drafts | Read only |
+| `get-note` | Read article or draft details | Read only |
+| `post-draft-note` | Create or update a draft | Save as draft |
+| `edit-note` | Save an existing article as a draft | Save as draft |
+| `set-note-eyecatch` | Set a local image as the title image for my draft | Update draft metadata |
+| `open-note-editor` | Generate an editor URL | Read only |
 
-公開、コメント、スキ、本文画像のアップロード、検索、Notion、Obsidian、HTTP/n8n、ブラウザ自動化はMVPの対象外です。公開操作はnote.comから行ってください。タイトル画像は、認証済みの自分の下書きに対して、実寸1280x670pxのPNG/JPEG/GIF/WebPローカルファイル（10MB以下）だけを設定できます。公開済み記事には設定できません。`post-draft-note` は note.com の create response、または認証済み下書き一覧から実際の note key を返します。
+Publishing, commenting, liking, uploading body images, searching, Notion, Obsidian, HTTP/n8n, and browser automation are outside the MVP. Publish from note.com. A title image can only be set on your authenticated draft, using a local PNG/JPEG/GIF/WebP file with actual dimensions of 1280x670 pixels and a size of 10 MB or less. Published articles are not supported. `post-draft-note` returns the actual note key from note.com's create response or the authenticated draft list.
 
-## MCPクライアント設定例
+## MCP Client Configuration Example
 
 ```json
 {
@@ -46,26 +47,30 @@ npm start
 }
 ```
 
-## 開発
+## Development
 
 ```bash
 npm run build
 npm test
 ```
 
-### 認証済み live smoke test（任意）
+### Authenticated Live Smoke Test (Optional)
 
-通常の `npm test` は認証情報を使いません。note.com の現在の API に対する確認は、次の環境変数を設定して別コマンドで実行します。
+`npm test` does not use credentials. To check the current note.com API, configure the following environment variables and run the separate command below.
 
-- `NOTE_LIVE_TESTS=true`（必須の明示的 opt-in）
-- `NOTE_USER_ID`（必須）
-- `NOTE_LIVE_NOTE_ID`（detail read 用の既存記事または下書きの ID／key）
-- `NOTE_SESSION_V5`、`NOTE_ALL_COOKIES`、または `NOTE_EMAIL` と `NOTE_PASSWORD`（read smoke は `NOTE_SESSION_V5` だけで実行可）
+- `NOTE_LIVE_TESTS=true` (required explicit opt-in)
+- `NOTE_USER_ID` (required)
+- `NOTE_LIVE_NOTE_ID` (ID or key of an existing article or draft for the detail read)
+- `NOTE_SESSION_V5`, `NOTE_ALL_COOKIES`, or `NOTE_EMAIL` and `NOTE_PASSWORD` (read smoke can run with `NOTE_SESSION_V5` alone)
 
 ```bash
 npm run test:live
 ```
 
-read smoke は `current_user` の一致と記事詳細の設定ユーザー所有を確認します。下書きの作成・編集まで確認する場合だけ `NOTE_LIVE_DRAFT_TESTS=true` も設定してください。下書きへのアイキャッチ設定と読み戻しまで確認する場合は、さらに `NOTE_LIVE_EYECATCH_TESTS=true` を設定してください。`NOTE_ALL_COOKIES` と `NOTE_LIVE_DRAFT_TESTS=true` で live draft smoke を実行する場合は事前チェックのため `NOTE_XSRF_TOKEN` も設定してください。実行時刻を含む `[note-ops live smoke ...]` のタイトルで識別できる下書きを作成し、返された note key で詳細を読み戻し、編集後に認証済みの下書き一覧への再取得で未公開状態を確認したうえで残します。アイキャッチ smoke はリポジトリ内のテスト画像を設定し、詳細取得と下書き一覧で確認します。作成した下書きは自動削除せず、cleanupする場合はその実行で作成した下書きだけを明示的に対象にしてください。live smoke は資格情報や full response body を出力しません。失敗時は操作名と確認事項だけを redacted して表示します。
+The read smoke verifies that `current_user` matches and that the article details belong to the configured user. Set `NOTE_LIVE_DRAFT_TESTS=true` only when checking draft creation and editing. To also check setting and reading back a draft title image, set `NOTE_LIVE_EYECATCH_TESTS=true`. When using `NOTE_ALL_COOKIES` with `NOTE_LIVE_DRAFT_TESTS=true` for live draft smoke, also set `NOTE_XSRF_TOKEN` for the preflight check. The test creates a draft with a title containing the execution time in the form `[note-ops live smoke ...]`, reads its details using the returned note key, verifies it remains unpublished by fetching the authenticated draft list after editing, and leaves it in place. The eyecatch smoke uses a test image from the repository and verifies the result through the note details and draft list. Drafts are not deleted automatically; if cleanup is needed, explicitly target only the draft created by that run. Live smoke does not print credentials or full response bodies. On failure, it prints only the operation name and redacted checks.
 
-仕様の詳細は [SPEC.md](SPEC.md) を参照してください。note.comの非公開API仕様変更により動作しなくなる可能性があります。
+See [SPEC.md](SPEC.md) for details. Changes to note.com's private API may cause this server to stop working.
+
+## GitHub Release
+
+See [docs/agents/release.md](docs/agents/release.md) for the release note format and creation procedure. The shared body template is [.github/release-notes-template.md](.github/release-notes-template.md), and the generated-note categories are managed in [.github/release.yml](.github/release.yml).
