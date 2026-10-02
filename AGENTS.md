@@ -1,13 +1,13 @@
 # Agent instructions
 
-Read `SPEC.md` before changing code. Treat it as the authoritative contract for the default server.
+Read `docs/docs/SPEC.md` before changing code. Treat it as the authoritative contract for the default server.
 
 ## Working sequence
 
 1. Inspect the current diff and the files named by the task.
 2. Keep the default entry point in `src/index.ts` and the default tool surface in `src/tools/mvp-tools.ts`.
 3. Reuse the existing API client, authentication, error handling, and Markdown conversion utilities.
-4. Keep content mutations on the draft-save path and eyecatch changes on the draft metadata path. A request to publish, comment, like, upload body images, or add an integration requires an explicit scope change and a `SPEC.md` update.
+4. Keep content mutations on the draft-save path and eyecatch changes on the draft metadata path. A request to publish, comment, like, upload body images, or add an integration requires an explicit scope change and a `docs/docs/SPEC.md` update.
 5. Add or update one small offline regression check for non-trivial behavior.
 6. Run `npm test` and report the result. Treat live note.com checks as separate because they require credentials.
 
@@ -22,11 +22,11 @@ Read `SPEC.md` before changing code. Treat it as the authoritative contract for 
 
 ## Scope and style
 
-- Prefer the smallest change that satisfies `SPEC.md`.
+- Prefer the smallest change that satisfies `docs/docs/SPEC.md`.
 - Use existing dependencies and standard Node.js facilities before adding code or packages.
 - Leave legacy, non-MVP source files unreachable from the default TypeScript entry point until their cleanup is explicitly scoped.
 - Keep public behavior backward compatible within the six-tool MVP contract.
-- Update `SPEC.md` when tool behavior, authentication, transport, or safety boundaries change.
+- Update `docs/docs/SPEC.md` when tool behavior, authentication, transport, or safety boundaries change.
 
 ## Project skills
 
@@ -37,6 +37,16 @@ Read `SPEC.md` before changing code. Treat it as the authoritative contract for 
 - Follow the commit-message policy in `CONTRIBUTING.md`.
 - Do not create commits unless the user explicitly requests it.
 
-## Git
 
-The agent may edit and verify the working tree. Branches, pushes, and pull requests require an explicit user request.
+## Branch And Pull Request Workflow
+
+- Do not edit, commit, or push directly to `main`. Make changes on a feature branch and merge them through a pull request.
+- Direct work on `main` is allowed only when the user explicitly authorizes it.
+
+## GitHub workflow
+
+- GitHub Issues are the canonical work tracker.
+- Shared Bug / Feature / Question forms and the default Pull Request template are inherited from `yuru-sha/.github`.
+- Shared non-default labels, including `orca:*`, are synchronized from `yuru-sha/project-template`.
+- Keep `.github/copilot-instructions.md` as a Copilot-review-specific policy; `AGENTS.md` remains the primary Codex repository guidance.
+- Use `orca:*` labels only for ORCA execution state; do not treat them as release categories.
