@@ -70,8 +70,11 @@ npm run test:live
 
 read smoke は `current_user` の一致と記事詳細の設定ユーザー所有を確認します。下書きの作成・編集まで確認する場合だけ `NOTE_LIVE_DRAFT_TESTS=true` も設定してください。下書きへのアイキャッチ設定と読み戻しまで確認する場合は、さらに `NOTE_LIVE_EYECATCH_TESTS=true` を設定してください。`NOTE_ALL_COOKIES` と `NOTE_LIVE_DRAFT_TESTS=true` で live draft smoke を実行する場合は事前チェックのため `NOTE_XSRF_TOKEN` も設定してください。実行時刻を含む `[note-ops live smoke ...]` のタイトルで識別できる下書きを作成し、返された note key で詳細を読み戻し、編集後に認証済みの下書き一覧への再取得で未公開状態を確認したうえで残します。アイキャッチ smoke はリポジトリ内のテスト画像を設定し、詳細取得と下書き一覧で確認します。作成した下書きは自動削除せず、cleanupする場合はその実行で作成した下書きだけを明示的に対象にしてください。live smoke は資格情報や full response body を出力しません。失敗時は操作名と確認事項だけを redacted して表示します。
 
-仕様の詳細は [SPEC.md](SPEC.md) を参照してください。note.comの非公開API仕様変更により動作しなくなる可能性があります。
+仕様の詳細は [docs/SPEC.md](docs/SPEC.md) を参照してください。note.comの非公開API仕様変更により動作しなくなる可能性があります。
 
-## GitHub Release
 
-See [docs/agents/release.md](docs/agents/release.md) for the release note format and creation procedure. The shared body template is [.github/release-notes-template.md](.github/release-notes-template.md), and the generated-note categories are managed in [.github/release.yml](.github/release.yml).
+## GitHub運用
+
+Codex向けのリポジトリ作業規約は [AGENTS.md](AGENTS.md) にあります。既定の Pull Request / Issue テンプレートは `yuru-sha/.github` を利用し、`orca:*` を含む共通ラベルは `yuru-sha/project-template` から同期します。
+
+Copilotレビュー専用の指示は `.github/copilot-instructions.md` に残します。

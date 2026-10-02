@@ -64,7 +64,7 @@ const repositoryRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const agentInstructions = readFileSync(join(repositoryRoot, "AGENTS.md"), "utf8");
 const readme = readFileSync(join(repositoryRoot, "README.md"), "utf8");
 const readmeJa = readFileSync(join(repositoryRoot, "README.ja.md"), "utf8");
-const spec = readFileSync(join(repositoryRoot, "SPEC.md"), "utf8");
+const spec = readFileSync(join(repositoryRoot, "docs/SPEC.md"), "utf8");
 const workflowSkill = readFileSync(
   join(repositoryRoot, "skills/note-management-workflow/SKILL.md"),
   "utf8"

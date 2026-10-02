@@ -69,8 +69,11 @@ npm run test:live
 
 The read smoke verifies that `current_user` matches and that the article details belong to the configured user. Set `NOTE_LIVE_DRAFT_TESTS=true` only when checking draft creation and editing. To also check setting and reading back a draft title image, set `NOTE_LIVE_EYECATCH_TESTS=true`. When using `NOTE_ALL_COOKIES` with `NOTE_LIVE_DRAFT_TESTS=true` for live draft smoke, also set `NOTE_XSRF_TOKEN` for the preflight check. The test creates a draft with a title containing the execution time in the form `[note-ops live smoke ...]`, reads its details using the returned note key, verifies it remains unpublished by fetching the authenticated draft list after editing, and leaves it in place. The eyecatch smoke uses a test image from the repository and verifies the result through the note details and draft list. Drafts are not deleted automatically; if cleanup is needed, explicitly target only the draft created by that run. Live smoke does not print credentials or full response bodies. On failure, it prints only the operation name and redacted checks.
 
-See [SPEC.md](SPEC.md) for details. Changes to note.com's private API may cause this server to stop working.
+See [docs/SPEC.md](docs/SPEC.md) for details. Changes to note.com's private API may cause this server to stop working.
 
-## GitHub Release
 
-See [docs/agents/release.md](docs/agents/release.md) for the release note format and creation procedure. The shared body template is [.github/release-notes-template.md](.github/release-notes-template.md), and the generated-note categories are managed in [.github/release.yml](.github/release.yml).
+## GitHub workflow
+
+Repository guidance for Codex is in [AGENTS.md](AGENTS.md). The default Pull Request and Issue templates are inherited from `yuru-sha/.github`, while shared labels (including `orca:*`) are synchronized from `yuru-sha/project-template`.
+
+Copilot review-specific instructions remain in `.github/copilot-instructions.md`.
