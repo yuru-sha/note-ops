@@ -1,3 +1,4 @@
+# Dependencies and build output
 node_modules/
 build/
 dist/
@@ -7,26 +8,21 @@ dist/
 .env.*
 !.env.sample
 
-# Logs and local tooling
+# Logs and local scratch files
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+*-draft.md
+logs/
+tmp/
+temp/
+
+# OS / editor files
+.DS_Store
+Thumbs.db
 .idea/
 .vscode/
 *.swp
 *.swo
-.DS_Store
-Thumbs.db
-
-# Local drafts and scratch files
-*-draft.md
-test-*.md
-client/
-logs/
-
-# Machine-local agent configuration
-.agents/agent-capabilities/
-.agents/skills/*
-.codex/agents/
-.codex/config.toml
+*~
