@@ -18,7 +18,7 @@ Preconditions:
 
 - Build output exists; run `npm run build` from the repository root.
 
-- Initialize and list: run `node skills/verify-note-ops/verify.mjs`. Observe `PASS: note-ops 0.1.0; 6 tools discovered` and the evidence path. The JSON artifact records the initialize/list action, server identity, protocol version, tool names/descriptions, stderr, and clean exit code.
+- Initialize and list: run `node .agents/skills/verify-note-ops/verify.mjs`. Observe `PASS: note-ops 0.1.0; 6 tools discovered` and the evidence path. The JSON artifact at `artifacts/verify-note-ops/<RUN_ID>/mcp-tool-discovery.json` records the initialize/list action, server identity, protocol version, tool names/descriptions, stderr, and clean exit code.
 - Confirm surface: verify the artifact contains `get-my-notes`, `get-note`, `post-draft-note`, `edit-note`, `set-note-eyecatch`, and `open-note-editor`, with no additional default tool.
 
 ## Gotchas

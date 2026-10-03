@@ -16,7 +16,7 @@ A user obtains the canonical note.com editor URL for a note using its key or an 
 Preconditions:
 
 - An MCP client is connected to this build.
-- For numeric IDs, configure `NOTE_USER_ID`, authentication, and use a note owned by that user. A supplied key does not trigger a note-list fetch.
+- `NOTE_USER_ID` is required for both paths. For numeric IDs, also configure authentication and use a note owned by that user. A supplied key does not trigger a note-list fetch or require note.com API credentials.
 
 - Key URL: call `open-note-editor` with `{ "noteId": "<note-key>" }`. Observe `https://editor.note.com/notes/<encoded-key>/edit/`.
 - Numeric ID URL: call `open-note-editor` with `{ "noteId": "<owned-numeric-id>" }`. Observe the same canonical URL shape after authenticated key resolution.
