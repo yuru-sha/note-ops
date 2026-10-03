@@ -17,6 +17,7 @@ yarn-error.log*
 logs/
 tmp/
 temp/
+artifacts/
 
 # OS / editor files
 .DS_Store

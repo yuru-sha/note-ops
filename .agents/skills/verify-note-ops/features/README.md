@@ -5,7 +5,7 @@ Read this index before driving note-ops. Its primary user surface is the local M
 ## Baseline
 
 - Build from the repository root with `npm run build`.
-- For offline checks, run `node skills/verify-note-ops/verify.mjs`; it launches and tears down its own stdio server child and writes proof under `.artifacts/verify-note-ops/`.
+- For offline checks, run `node .agents/skills/verify-note-ops/verify.mjs`; it launches and tears down its own stdio server child and writes proof under `artifacts/verify-note-ops/<RUN_ID>/`.
 - For note.com operations, use the user's configured MCP client and verified `NOTE_USER_ID` identity. Never include secrets in captured artifacts.
 - Writes save drafts or draft eyecatch metadata only; do not publish.
 

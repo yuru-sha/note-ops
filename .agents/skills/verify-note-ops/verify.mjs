@@ -4,8 +4,9 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 const root = process.cwd();
-const evidenceDir = resolve(root, ".artifacts/verify-note-ops");
-const evidencePath = resolve(evidenceDir, `${new Date().toISOString().replaceAll(":", "-")}.json`);
+const runId = new Date().toISOString().replaceAll(":", "-");
+const evidenceDir = resolve(root, "artifacts/verify-note-ops", runId);
+const evidencePath = resolve(evidenceDir, "mcp-tool-discovery.json");
 const env = Object.fromEntries(
   Object.entries(process.env).filter(([key]) => !key.startsWith("NOTE_"))
 );
