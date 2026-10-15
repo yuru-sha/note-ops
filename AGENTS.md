@@ -47,13 +47,12 @@ npm run test:live       # opt-in note.com smoke workflow
 - Keep content mutations on the draft-save path and eyecatch changes on the draft metadata path. The six-tool MVP contract excludes publishing, comments, likes, body-image uploads, integrations, HTTP/n8n, and browser automation unless the specification is explicitly changed.
 - Root `tsconfig.json` explicitly includes the default entry, MVP tool module, and live-smoke utility; imported modules form the compiled dependency graph. Keep unrelated legacy modules unreachable from the default entry unless their cleanup is specifically in scope.
 
-## Code and Comment Guidance
+## Code, Tests, Commits, and Comments
 
-Use each artifact to communicate a different kind of intent:
-
-- Code explains **how** behavior is implemented.
-- Tests explain **what** behavior is expected.
-- Comments explain **why not**: document non-obvious constraints, rejected alternatives, trade-offs, or why the seemingly simpler approach is incorrect. Do not restate what clear code already says.
+- Code should make how the behavior is implemented clear.
+- Tests should make what behavior is expected clear.
+- Commit messages should explain why the change is needed.
+- Comments should explain why not an apparently reasonable alternative was chosen, including relevant constraints or non-obvious intent. Do not use comments to paraphrase the code's behavior.
 
 ## Project Skills
 

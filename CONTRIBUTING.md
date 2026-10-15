@@ -34,8 +34,6 @@ Do not claim checks passed when they were not run.
 
 Use [Conventional Commits 1.0.0](https://www.conventionalcommits.org/ja/v1.0.0/) for commit messages.
 
-The description and optional body should explain **why** the change was needed, not only what changed.
-
 The commit message format is:
 
 ```text
