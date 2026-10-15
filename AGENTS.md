@@ -53,7 +53,6 @@ Use each artifact to communicate a different kind of intent:
 
 - Code explains **how** behavior is implemented.
 - Tests explain **what** behavior is expected.
-- Commit messages explain **why** the change was made.
 - Comments explain **why not**: document non-obvious constraints, rejected alternatives, trade-offs, or why the seemingly simpler approach is incorrect. Do not restate what clear code already says.
 
 ## Project Skills
