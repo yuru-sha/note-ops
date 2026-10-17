@@ -5,7 +5,7 @@
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/yuru-sha/note-ops)
 
 note.comの記事と下書きを管理するための、ローカルstdio MCPサーバーです。
-現在は下書き中心のMVPだけを提供しています。
+下書き操作と、読み取り専用の記事ページビュー取得を提供します。
 
 ## クイックスタート
 
@@ -18,9 +18,9 @@ npm run build
 npm start
 ```
 
-認証対象の一覧取得・詳細取得・下書き作成・下書き編集には、`NOTE_USER_ID` と、既存セッション（`NOTE_SESSION_V5`。下書き操作では `NOTE_XSRF_TOKEN` またはセッション応答のXSRFトークンを使用）、`NOTE_ALL_COOKIES`、または `NOTE_EMAIL` と `NOTE_PASSWORD` の直接ログインを設定します。認証値はコミットせず、ログやMCPレスポンスに出力しないでください。
+記事・下書き一覧や詳細の取得、ページビュー取得、下書き作成・編集には、`NOTE_USER_ID` と、既存セッション（`NOTE_SESSION_V5`。下書き操作では `NOTE_XSRF_TOKEN` またはセッション応答のXSRFトークンを使用）、`NOTE_ALL_COOKIES`、または `NOTE_EMAIL` と `NOTE_PASSWORD` の直接ログインを設定します。認証値はコミットせず、ログやMCPレスポンスに出力しないでください。
 
-認証対象の操作では、note.com の `current_user` と `NOTE_USER_ID` が一致することを事前に確認します。`get-note`、`edit-note`、`set-note-eyecatch` では記事の所有者も確認します。`get-note` に numeric ID を渡した場合は、認証済みユーザーの記事一覧から note key を解決して詳細を取得します。`open-note-editor` も numeric ID の場合は認証済みユーザーの記事一覧から note key を解決し、`https://editor.note.com/notes/<note-key>/edit/` を返します。一致しない、所有者を確認できない、note key を解決できない、または認証に失敗した場合は処理を中止し、秘密情報を含まないエラーを返します。記事キーを直接渡した場合の `open-note-editor` は一覧取得を行いません。
+認証対象の操作では、note.com の `current_user` と `NOTE_USER_ID` が一致することを事前に確認します。ページビュー取得もこの確認済みユーザーのセッションで行います。`get-note`、`edit-note`、`set-note-eyecatch` では記事の所有者も確認します。`get-note` に numeric ID を渡した場合は、認証済みユーザーの記事一覧から note key を解決して詳細を取得します。`open-note-editor` も numeric ID の場合は認証済みユーザーの記事一覧から note key を解決し、`https://editor.note.com/notes/<note-key>/edit/` を返します。一致しない、所有者を確認できない、note key を解決できない、または認証に失敗した場合は処理を中止し、秘密情報を含まないエラーを返します。記事キーを直接渡した場合の `open-note-editor` は一覧取得を行いません。
 
 ## MCPツール
 
@@ -28,13 +28,13 @@ npm start
 |---|---|---|
 | `get-my-notes` | 自分の記事・下書き一覧 | 読み取り |
 | `get-note` | 記事・下書き詳細 | 読み取り |
+| `get-note-page-views` | 指定期間の記事ページビュー（PV）取得 | 読み取り |
 | `post-draft-note` | 新規下書き作成・更新 | 下書き保存 |
 | `edit-note` | 既存記事を下書き保存 | 下書き保存 |
 | `set-note-eyecatch` | 自分の下書きにローカル画像をタイトル画像として設定 | 下書きメタデータ更新 |
 | `open-note-editor` | 編集URL生成 | 読み取り |
 
-公開、コメント、スキ、本文画像のアップロード、検索、Notion、Obsidian、HTTP/n8n、ブラウザ自動化はMVPの対象外です。公開操作はnote.comから行ってください。タイトル画像は、認証済みの自分の下書きに対して、実寸1280x670pxのPNG/JPEG/GIF/WebPローカルファイル（10MB以下）だけを設定できます。公開済み記事には設定できません。`post-draft-note` は note.com の create response、または認証済み下書き一覧から実際の note key を返します。
-
+公開、コメント、スキ、本文画像のアップロード、ページビュー以外の分析、検索、Notion、Obsidian、HTTP/n8n、ブラウザ自動化はMVPの対象外です。`get-note-page-views` はnote.comの非公開ダッシュボードGraphQL APIからページビュー（PV）を読み取ります。インプレッションやAmazonクリックとは異なる指標です。API仕様変更で保守が必要になる場合があります。対応期間は `LAST_7_DAYS`、`LAST_28_DAYS`、`LAST_365_DAYS`、`THIS_MONTH`、`LAST_MONTH`、`ALL` と、`startDate`・`endDate` で2014-04-01から本日までを指定する `CUSTOM` です。記事ごとの `noteKey`、`url`、`pageViews` と対象期間を返します。公開操作はnote.comから行ってください。タイトル画像は、認証済みの自分の下書きに対して、実寸1280x670pxのPNG/JPEG/GIF/WebPローカルファイル（10MB以下）だけを設定できます。公開済み記事には設定できません。`post-draft-note` は note.com の create response、または認証済み下書き一覧から実際の note key を返します。
 ## MCPクライアント設定例
 
 ```json

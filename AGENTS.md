@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-`note-ops` is a local MCP stdio server for managing one configured note.com user's articles and drafts. The default server exposes exactly six tools and only saves drafts or draft eyecatch metadata. Treat [`docs/SPEC.md`](docs/SPEC.md) as the behavioral and safety contract; note.com uses private APIs whose behavior can change independently.
+`note-ops` is a local MCP stdio server for managing one configured note.com user's articles and drafts. The default server exposes seven tools; writes remain limited to draft saves and draft eyecatch metadata. Treat [`docs/SPEC.md`](docs/SPEC.md) as the behavioral and safety contract; note.com uses private APIs whose behavior can change independently.
 
 ## Architecture & Data Flow
 
@@ -42,9 +42,9 @@ npm run test:live       # opt-in note.com smoke workflow
 - Use TypeScript ES modules, strict typing, async/await for I/O, and shared utility functions rather than duplicate request/auth logic.
 - Validate tool arguments with Zod before making network requests. Keep handlers focused on validation, orchestration, and MCP response construction; route API errors through the shared redacting error handler.
 - Preserve injectable request functions for deterministic offline tests. Keep network access behind the shared API client.
-- Verify configured-user identity before authenticated list, read, create-draft, or edit-draft operations, and verify target-note ownership for `get-note`, `edit-note`, and `set-note-eyecatch`; fail closed when identity or ownership is unavailable, mismatched, or conflicting. Require an XSRF token for draft and eyecatch writes.
+- Verify configured-user identity before authenticated list, read, page-view, create-draft, or edit-draft operations, and verify target-note ownership for `get-note`, `edit-note`, and `set-note-eyecatch`; fail closed when identity or ownership is unavailable, mismatched, or conflicting. Require an XSRF token for draft and eyecatch writes.
 - Keep credentials in environment variables or the user's existing local session configuration. Log operation names and HTTP status only; credential values, cookies, XSRF tokens, passwords, and full response bodies remain private. Encode note IDs and keys before placing them in paths or URLs.
-- Keep content mutations on the draft-save path and eyecatch changes on the draft metadata path. The six-tool MVP contract excludes publishing, comments, likes, body-image uploads, integrations, HTTP/n8n, and browser automation unless the specification is explicitly changed.
+- Keep content mutations on the draft-save path and eyecatch changes on the draft metadata path. Analytics reads are limited to the configured user's page-view data. Publishing, comments, likes, body-image uploads, integrations, HTTP/n8n, and browser automation remain outside the default surface unless the specification is explicitly changed.
 - Root `tsconfig.json` explicitly includes the default entry, MVP tool module, and live-smoke utility; imported modules form the compiled dependency graph. Keep unrelated legacy modules unreachable from the default entry unless their cleanup is specifically in scope.
 
 ## Code, Tests, Commits, and Comments
@@ -68,7 +68,7 @@ npm run test:live       # opt-in note.com smoke workflow
 
 - `docs/SPEC.md` — authoritative default-server contract, safety rules, and verification requirements.
 - `src/index.ts` — stdio server entry point.
-- `src/tools/mvp-tools.ts` — six-tool registration and behavior.
+- `src/tools/mvp-tools.ts` — seven-tool registration and behavior.
 - `src/utils/api-client.ts`, `auth.ts`, `note-normalizers.ts`, `markdown-converter.ts`, `error-handler.ts` — core request, trust, and content behavior.
 - `src/config/environment.ts` — `.env` and `NOTE_*` configuration.
 - `package.json`, `package-lock.json`, `tsconfig.json` — scripts, dependency lock, compiler configuration.

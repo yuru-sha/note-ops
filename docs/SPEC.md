@@ -22,6 +22,7 @@ The default server exposes exactly these tools:
 |---|---|---|
 | `get-my-notes` | List the configured user's articles and drafts | No |
 | `get-note` | Read an article or draft by ID/key | No |
+| `get-note-page-views` | Read configured-user article page views for a supported period | No |
 | `post-draft-note` | Create or save a draft | Draft save |
 | `edit-note` | Save an existing article as a draft | Draft save |
 | `set-note-eyecatch` | Upload a local image and set it as the configured user's own draft eyecatch | Draft metadata update |
@@ -31,6 +32,7 @@ The default server exposes exactly these tools:
 
 - `get-my-notes` requires `NOTE_USER_ID` and supports `all`, `draft`, and `public` filters.
 - `get-note` accepts a note ID or key and includes draft content when note.com returns it. Numeric IDs are resolved through the authenticated user's note list, and the detail endpoint is called with the returned note key.
+- `get-note-page-views` requires a supported `period` (`LAST_7_DAYS`, `LAST_28_DAYS`, `LAST_365_DAYS`, `THIS_MONTH`, `LAST_MONTH`, `ALL`, or `CUSTOM`) and reads the authenticated dashboard's `dashboardNoteListConnection` GraphQL operation at `https://graphql.note.com/graphql`. `CUSTOM` additionally requires `startDate` and `endDate` as calendar dates from 2014-04-01 through today, with start not after end. The request uses the dashboard operation's `unit`, `date`, optional `endDate`, `order`, `first`, and `after` variables and paginates until `hasNextPage` is false. It returns only each article's note key, absolute URL, and `pageViews`, plus the selected period and date range. `pageViewCount` is page views (PV), not impressions or Amazon clicks; the dashboard renders a missing count as zero. `current_user` is verified against `NOTE_USER_ID` before the user-scoped dashboard query; the observed dashboard article type has no owner field, so the result is scoped by the authenticated dashboard operation. Missing article identity, URL, count, or malformed pagination fails closed.
 - `post-draft-note` accepts Markdown or HTML. Markdown is converted to note.com HTML; already-HTML input is preserved. KaTeX display blocks delimited by `$$` on their own lines retain their delimiters and line breaks without an enclosing HTML paragraph.
 - `post-draft-note` returns the note key from the create response or the authenticated draft list when note.com omits it; it does not fabricate a key from the numeric ID.
 - `edit-note` resolves note keys when necessary and always uses the draft-save path.
@@ -53,7 +55,7 @@ NOTE_XSRF_TOKEN=your_xsrf_token
 
 Authenticated operations require `NOTE_USER_ID` and an authentication source: `NOTE_SESSION_V5`, `NOTE_ALL_COOKIES`, or `NOTE_EMAIL` plus `NOTE_PASSWORD`. Draft and eyecatch writes include an XSRF token from `NOTE_XSRF_TOKEN` or the authenticated session response when available. The note.com API may reject a write without it. When `NOTE_ALL_COOKIES` and `NOTE_LIVE_DRAFT_TESTS=true` are used, the live draft smoke preflight requires `NOTE_XSRF_TOKEN`. `open-note-editor` accepts a note key directly, but numeric IDs require an authenticated note-list lookup to resolve the note key. It fails closed when the numeric ID cannot be resolved or ownership cannot be verified.
 
-Before any authenticated list, read, create-draft, or edit-draft operation, the server resolves `current_user` and requires its `id` or `urlname` to match `NOTE_USER_ID`. If the identity is unavailable or mismatched, the operation fails closed with a redacted diagnostic. This check applies to session cookies, `NOTE_ALL_COOKIES`, and the optional email/password login path.
+Before any authenticated list, read, page-view, create-draft, or edit-draft operation, the server resolves `current_user` and requires its `id` or `urlname` to match `NOTE_USER_ID`. If the identity is unavailable or mismatched, the operation fails closed with a redacted diagnostic. This check applies to session cookies, `NOTE_ALL_COOKIES`, and the optional email/password login path.
 
 `get-note`, `edit-note`, and `set-note-eyecatch` also require the target note to belong to `NOTE_USER_ID`; missing or mismatched ownership fails closed. Numeric IDs that cannot be mapped to a note key return a clear diagnostic. Authentication and API errors are returned as actionable MCP errors without secrets or full response bodies.
 
@@ -64,7 +66,7 @@ identity and XSRF token state.
 
 ## Safety boundary
 
-The MVP writes only drafts and draft eyecatch metadata. Publication, comments, likes, body-image uploads, analytics, search, memberships, Notion, Obsidian, HTTP/n8n, and browser automation are outside the default server surface.
+The MVP writes only drafts and draft eyecatch metadata. Page-view analytics are read-only and use note.com's private dashboard GraphQL API; this surface may require maintenance if note.com changes that API. Other analytics, publication, comments, likes, body-image uploads, search, memberships, Notion, Obsidian, HTTP/n8n, and browser automation remain outside the default server.
 
 ## Verification
 

@@ -1,8 +1,8 @@
 # Copilot review instructions
 
 - Review every change against `docs/SPEC.md` and `AGENTS.md`; treat `docs/SPEC.md` as the contract for the default server.
-- Keep the default surface narrow: local MCP stdio, the six tools listed in `docs/SPEC.md`, and the existing API, authentication, error-handling, and Markdown utilities.
-- Check authenticated list/read/write paths for configured-user identity and target-note ownership. Require fail-closed behavior for missing, mismatched, or conflicting identity or ownership, and require XSRF protection for draft and eyecatch writes.
+- Keep the default surface narrow: local MCP stdio, the seven tools listed in `docs/SPEC.md`, and the existing API, authentication, error-handling, and Markdown utilities. Analytics additions must remain read-only and limited to the configured user's page-view data.
+- Check authenticated list/read/write and dashboard page-view paths for configured-user identity; require target-note ownership checks where the API returns ownership fields. Require fail-closed behavior for missing, mismatched, or conflicting identity or ownership, and require XSRF protection for draft and eyecatch writes.
 - Check that writes remain draft saves or draft eyecatch metadata. Treat publication, comments, likes, body-image uploads, integrations, HTTP/n8n, and browser automation as out of scope unless `docs/SPEC.md` is updated.
 - Check URL encoding for note IDs and keys, redacted errors and logs, and validation before network requests at trust boundaries.
 - Prefer small, focused changes that reuse existing code. Review tests for meaningful offline coverage and run `npm test`; credential-gated live note.com checks are separate.
