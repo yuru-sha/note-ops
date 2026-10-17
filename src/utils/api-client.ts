@@ -1,5 +1,9 @@
 import fetch, { FormData } from "node-fetch";
-import { API_BASE_URL, DEFAULT_HEADERS } from "../config/api-config.js";
+import {
+  API_BASE_URL,
+  DASHBOARD_GRAPHQL_ENDPOINT,
+  DEFAULT_HEADERS,
+} from "../config/api-config.js";
 import { env } from "../config/environment.js";
 import { NoteApiResponse } from "../types/api-types.js";
 import { buildAuthHeaders, ensureAuthenticatedUser, hasAuth } from "./auth.js";
@@ -63,7 +67,11 @@ export async function noteApiRequest(
       console.error(`API request: auth=${hasAuth() ? "present" : "absent"}`);
     }
 
-    const response = await requestFetch(`${API_BASE_URL}${endpoint}`, options);
+    const url =
+      endpoint === DASHBOARD_GRAPHQL_ENDPOINT
+        ? DASHBOARD_GRAPHQL_ENDPOINT
+        : `${API_BASE_URL}${endpoint}`;
+    const response = await requestFetch(url, options);
     if (env.DEBUG) console.error(`API response: status=${response.status}`);
 
     if (!response.ok) {

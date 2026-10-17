@@ -1,5 +1,6 @@
 // APIのベースURL
 export const API_BASE_URL = "https://note.com/api";
+export const DASHBOARD_GRAPHQL_ENDPOINT = "https://graphql.note.com/graphql";
 
 // 共通ヘッダー
 export const DEFAULT_HEADERS = {

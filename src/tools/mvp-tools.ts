@@ -4,6 +4,7 @@ import { File, FormData } from "node-fetch";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { env } from "../config/environment.js";
+import { DASHBOARD_GRAPHQL_ENDPOINT } from "../config/api-config.js";
 import { noteApiRequest } from "../utils/api-client.js";
 import {
   buildAuthHeaders,
@@ -25,6 +26,7 @@ import {
 export const MVP_TOOL_NAMES = [
   "get-my-notes",
   "get-note",
+  "get-note-page-views",
   "post-draft-note",
   "edit-note",
   "set-note-eyecatch",
@@ -410,6 +412,234 @@ async function fetchNoteListPage(
   return normalizeNoteListResponse(result);
 }
 
+const DASHBOARD_PAGE_VIEW_QUERY = `query Dashboard_StatPageQuery(
+  $unit: DashboardPeriodUnit!
+  $date: Datetime!
+  $endDate: Datetime
+  $order: DashboardNoteListOrder
+  $first: Int!
+  $after: String
+) {
+  dashboardNoteListConnection(unit: $unit, date: $date, endDate: $endDate, order: $order, first: $first, after: $after) {
+    pageInfo { hasNextPage endCursor }
+    edges { node { note { key link { absoluteUrl } } metrics { pageViewCount } } }
+  }
+}`;
+const DASHBOARD_PAGE_VIEW_PAGE_SIZE = 100;
+const DASHBOARD_FIRST_DATA_DATE = "2014-04-01";
+
+type DashboardPageViewPeriod =
+  | "LAST_7_DAYS"
+  | "LAST_28_DAYS"
+  | "LAST_365_DAYS"
+  | "THIS_MONTH"
+  | "LAST_MONTH"
+  | "ALL"
+  | "CUSTOM";
+
+interface DashboardPeriodRange {
+  unit: DashboardPageViewPeriod | "MONTH";
+  date: string;
+  endDate?: string;
+  period: {
+    preset: DashboardPageViewPeriod;
+    startDate: string;
+    endDate: string;
+  };
+}
+
+interface DashboardPageView {
+  noteKey: string;
+  url: string;
+  pageViews: number;
+}
+
+const dashboardGraphqlEnvelopeSchema = z.object({
+  errors: z.array(z.unknown()).optional(),
+  data: z.unknown().optional(),
+});
+const dashboardPageViewDataSchema = z.object({
+  dashboardNoteListConnection: z.object({
+    pageInfo: z.object({ hasNextPage: z.boolean(), endCursor: z.string().nullable() }),
+    edges: z.array(
+      z.object({
+        node: z.object({
+          note: z.object({
+            key: z.string().min(1),
+            link: z.object({ absoluteUrl: z.string().url() }),
+          }),
+          metrics: z.object({ pageViewCount: z.number().int().nonnegative().refine(Number.isSafeInteger).nullable() }),
+        }),
+      })
+    ),
+  }),
+});
+function dashboardDate(date: Date): { apiDate: string; calendarDate: string } {
+  const calendarDate = [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("-");
+  return { apiDate: `${calendarDate}T00:00:00.000Z`, calendarDate };
+}
+function dashboardCalendarDate(value: string): Date {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    throw new Error("カスタム期間の日付はYYYY-MM-DD形式で指定してください。");
+  }
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  if (dashboardDate(date).calendarDate !== value) {
+    throw new Error("カスタム期間の日付が無効です。");
+  }
+  return date;
+}
+
+
+function dashboardPeriodRange(
+  period: DashboardPageViewPeriod,
+  customStartDate?: string,
+  customEndDate?: string,
+  now = new Date()
+): DashboardPeriodRange {
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (period === "CUSTOM") {
+    if (!customStartDate || !customEndDate) {
+      throw new Error("カスタム期間には開始日と終了日の両方が必要です。");
+    }
+    const start = dashboardCalendarDate(customStartDate);
+    const end = dashboardCalendarDate(customEndDate);
+    const todayDate = dashboardDate(today).calendarDate;
+    if (
+      customStartDate < DASHBOARD_FIRST_DATA_DATE ||
+      customStartDate > customEndDate ||
+      customEndDate > todayDate
+    ) {
+      throw new Error("カスタム期間は2014-04-01から本日までの範囲で指定してください。");
+    }
+    return {
+      unit: period,
+      date: dashboardDate(start).apiDate,
+      endDate: dashboardDate(end).apiDate,
+      period: { preset: period, startDate: customStartDate, endDate: customEndDate },
+    };
+  }
+  if (customStartDate !== undefined || customEndDate !== undefined) {
+    throw new Error("開始日と終了日はカスタム期間の指定時のみ使用できます。");
+  }
+
+  const start = new Date(today);
+  let unit: DashboardPeriodRange["unit"] = period;
+  if (period === "LAST_7_DAYS") start.setDate(start.getDate() - 6);
+  else if (period === "LAST_28_DAYS") start.setDate(start.getDate() - 27);
+  else if (period === "LAST_365_DAYS") start.setDate(start.getDate() - 364);
+  else if (period === "THIS_MONTH") {
+    unit = "MONTH";
+    start.setDate(1);
+  } else if (period === "LAST_MONTH") {
+    unit = "MONTH";
+    start.setMonth(start.getMonth() - 1, 1);
+    const end = new Date(today.getFullYear(), today.getMonth(), 0);
+    return {
+      unit,
+      date: dashboardDate(start).apiDate,
+      period: {
+        preset: period,
+        startDate: dashboardDate(start).calendarDate,
+        endDate: dashboardDate(end).calendarDate,
+      },
+    };
+  } else if (period === "ALL") {
+    const [year, month, day] = DASHBOARD_FIRST_DATA_DATE.split("-").map(Number);
+    start.setTime(new Date(year, month - 1, day).getTime());
+  }
+
+  return {
+    unit,
+    date: dashboardDate(period === "ALL" ? today : start).apiDate,
+    period: {
+      preset: period,
+      startDate: dashboardDate(start).calendarDate,
+      endDate: dashboardDate(today).calendarDate,
+    },
+  };
+}
+
+async function fetchDashboardPageViews(
+  period: DashboardPageViewPeriod,
+  request: NoteApiRequest,
+  customStartDate?: string,
+  customEndDate?: string
+): Promise<{ period: DashboardPeriodRange["period"]; articles: DashboardPageView[] }> {
+  if (!env.NOTE_USER_ID) throw new Error("環境変数 NOTE_USER_ID が設定されていません。");
+
+  const range = dashboardPeriodRange(period, customStartDate, customEndDate);
+  const articles: DashboardPageView[] = [];
+  const seenNoteKeys = new Set<string>();
+  const seenCursors = new Set<string>();
+  let after: string | null = null;
+
+  while (true) {
+    const rawResponse: unknown = await request(
+      DASHBOARD_GRAPHQL_ENDPOINT,
+      "POST",
+      {
+        operationName: "Dashboard_StatPageQuery",
+        variables: {
+          unit: range.unit,
+          date: range.date,
+          ...(range.endDate ? { endDate: range.endDate } : {}),
+          order: "PAGE_VIEW_COUNT_DESC",
+          first: DASHBOARD_PAGE_VIEW_PAGE_SIZE,
+          after,
+        },
+        query: DASHBOARD_PAGE_VIEW_QUERY,
+      },
+      true,
+      {
+        "content-type": "application/json",
+        origin: "https://note.com",
+        referer: "https://note.com/dashboard?metric=PAGE_VIEW",
+      }
+    );
+
+    const envelope = dashboardGraphqlEnvelopeSchema.safeParse(rawResponse);
+    if (!envelope.success || (envelope.data.errors?.length ?? 0) > 0) {
+      throw new Error("note.comのダッシュボードAPIがページビューを返しませんでした。");
+    }
+    const data = dashboardPageViewDataSchema.safeParse(envelope.data.data);
+    if (!data.success) {
+      throw new Error("note.comのダッシュボード応答を確認できないため、取得を中止しました。");
+    }
+    const connection = data.data.dashboardNoteListConnection;
+
+    for (const edge of connection.edges) {
+      const article = {
+        noteKey: edge.node.note.key,
+        url: edge.node.note.link.absoluteUrl,
+        pageViews: edge.node.metrics.pageViewCount ?? 0,
+      };
+      if (!article.url.startsWith("https://note.com/")) {
+        throw new Error("ダッシュボードの記事指標を確認できないため、取得を中止しました。");
+      }
+      if (seenNoteKeys.has(article.noteKey)) {
+        throw new Error("note.comのダッシュボードに重複記事があるため、取得を中止しました。");
+      }
+      seenNoteKeys.add(article.noteKey);
+      articles.push(article);
+    }
+
+    if (!connection.pageInfo.hasNextPage) break;
+    const cursor = connection.pageInfo.endCursor;
+    if (!cursor || seenCursors.has(cursor)) {
+      throw new Error("note.comのダッシュボードページ送りを確認できないため、取得を中止しました。");
+    }
+    seenCursors.add(cursor);
+    after = cursor;
+  }
+
+  return { period: range.period, articles };
+}
+
 export function registerMvpTools(server: McpServer, request: NoteApiRequest = noteApiRequest): void {
   server.tool(
     "get-my-notes",
@@ -481,6 +711,30 @@ export function registerMvpTools(server: McpServer, request: NoteApiRequest = no
     }
   );
 
+  server.tool(
+    "get-note-page-views",
+    "指定期間の自分の記事ページビュー（PV）を取得する。インプレッションとは異なる指標。",
+    {
+      period: z.enum([
+        "LAST_7_DAYS",
+        "LAST_28_DAYS",
+        "LAST_365_DAYS",
+        "THIS_MONTH",
+        "LAST_MONTH",
+        "ALL",
+        "CUSTOM",
+      ]).describe("取得期間。CUSTOMの場合は開始日と終了日も指定"),
+      startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("CUSTOM期間の開始日（YYYY-MM-DD）"),
+      endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("CUSTOM期間の終了日（YYYY-MM-DD）"),
+    },
+    async ({ period, startDate, endDate }) => {
+      try {
+        return createSuccessResponse(await fetchDashboardPageViews(period, request, startDate, endDate));
+      } catch (error) {
+        return handleApiError(error, "ページビュー取得");
+      }
+    }
+  );
   server.tool(
     "post-draft-note",
     "MarkdownまたはHTML本文を下書き保存する",

@@ -19,6 +19,7 @@ import {
   noteKeyForId,
   assertEyecatchSize,
 } from "../build/tools/mvp-tools.js";
+import { DASHBOARD_GRAPHQL_ENDPOINT } from "../build/config/api-config.js";
 import { env } from "../build/config/environment.js";
 import {
   extractNotePayload,
@@ -119,25 +120,178 @@ function webpHeader(kind, width, height) {
   return header;
 }
 
-test("MVP exposes only note management tools", () => {
+test("MVP registers the seven documented tools in the documented order", () => {
   assert.deepEqual([...MVP_TOOL_NAMES], [
     "get-my-notes",
     "get-note",
+    "get-note-page-views",
     "post-draft-note",
     "edit-note",
     "set-note-eyecatch",
     "open-note-editor",
   ]);
+  assert.deepEqual([...registerHandlers(async () => ({})).keys()], [...MVP_TOOL_NAMES]);
+});
+test("page-view reads use the dashboard period, paginate, and return normalized fields", async () => {
+  const originalUserId = env.NOTE_USER_ID;
+  env.NOTE_USER_ID = "owner";
+  const requests = [];
+  const responses = [
+    {
+      data: {
+        dashboardNoteListConnection: {
+          pageInfo: { hasNextPage: true, endCursor: "cursor-1" },
+          edges: [{
+            node: {
+              note: { key: "note-key-one", link: { absoluteUrl: "https://note.com/owner/n/note-key-one" } },
+              metrics: { pageViewCount: 12 },
+            },
+          }],
+        },
+      },
+    },
+    {
+      data: {
+        dashboardNoteListConnection: {
+          pageInfo: { hasNextPage: false, endCursor: null },
+          edges: [{
+            node: {
+              note: { key: "note-key-two", link: { absoluteUrl: "https://note.com/owner/n/note-key-two" } },
+              metrics: { pageViewCount: null },
+            },
+          }],
+        },
+      },
+    },
+  ];
+  try {
+    const handler = registerHandlers(async (...args) => {
+      requests.push(args);
+      return responses.shift();
+    }).get("get-note-page-views");
+    const result = await handler({ period: "LAST_28_DAYS" });
+    const payload = JSON.parse(result.content[0].text);
+    assert.equal(requests.length, 2);
+    assert.equal(requests[0][0], "https://graphql.note.com/graphql");
+    assert.equal(requests[0][1], "POST");
+    assert.equal(requests[0][3], true);
+    assert.equal(requests[0][2].variables.unit, "LAST_28_DAYS");
+    assert.equal(requests[0][2].variables.first, 100);
+    assert.equal(requests[0][2].variables.after, null);
+    assert.equal(requests[1][2].variables.after, "cursor-1");
+    assert.deepEqual(payload.articles, [
+      { noteKey: "note-key-one", url: "https://note.com/owner/n/note-key-one", pageViews: 12 },
+      { noteKey: "note-key-two", url: "https://note.com/owner/n/note-key-two", pageViews: 0 },
+    ]);
+    assert.equal(payload.period.preset, "LAST_28_DAYS");
+    assert.match(payload.period.startDate, /^\d{4}-\d{2}-\d{2}$/);
+    assert.match(payload.period.endDate, /^\d{4}-\d{2}-\d{2}$/);
+    assert.deepEqual(Object.keys(payload.articles[0]), ["noteKey", "url", "pageViews"]);
+  } finally {
+    env.NOTE_USER_ID = originalUserId;
+  }
+});
+test("page-view reads pass custom dashboard date ranges", async () => {
+  const originalUserId = env.NOTE_USER_ID;
+  const requests = [];
+  try {
+    env.NOTE_USER_ID = "owner";
+    const handler = registerHandlers(async (...args) => {
+      requests.push(args);
+      return {
+        data: {
+          dashboardNoteListConnection: {
+            pageInfo: { hasNextPage: false, endCursor: null },
+            edges: [],
+          },
+        },
+      };
+    }).get("get-note-page-views");
+    const result = await handler({
+      period: "CUSTOM",
+      startDate: "2025-06-01",
+      endDate: "2025-06-30",
+    });
+    const payload = JSON.parse(result.content[0].text);
+    assert.equal(requests.length, 1);
+    assert.deepEqual(
+      {
+        unit: requests[0][2].variables.unit,
+        date: requests[0][2].variables.date,
+        endDate: requests[0][2].variables.endDate,
+      },
+      {
+        unit: "CUSTOM",
+        date: "2025-06-01T00:00:00.000Z",
+        endDate: "2025-06-30T00:00:00.000Z",
+      }
+    );
+    assert.deepEqual(payload.period, {
+      preset: "CUSTOM",
+      startDate: "2025-06-01",
+      endDate: "2025-06-30",
+    });
+  } finally {
+    env.NOTE_USER_ID = originalUserId;
+  }
 });
 
-test("project instructions match the six-tool MVP contract", () => {
-  assert.match(agentInstructions, /six-tool MVP contract/i);
-  assert.doesNotMatch(agentInstructions, /five-tool MVP contract/i);
+test("invalid custom page-view ranges fail before the dashboard request", async () => {
+  const originalUserId = env.NOTE_USER_ID;
+  let requestCount = 0;
+  try {
+    env.NOTE_USER_ID = "owner";
+    const handler = registerHandlers(async () => {
+      requestCount += 1;
+      return {};
+    }).get("get-note-page-views");
+    for (const input of [
+      { period: "CUSTOM" },
+      { period: "CUSTOM", startDate: "2025-02-30", endDate: "2025-03-01" },
+      { period: "CUSTOM", startDate: "2025-07-01", endDate: "2025-06-30" },
+    ]) {
+      const result = await handler(input);
+      assert.equal(result.isError, true);
+    }
+    assert.equal(requestCount, 0);
+  } finally {
+    env.NOTE_USER_ID = originalUserId;
+  }
+});
+test("page-view reads fail closed for malformed dashboard records and missing user configuration", async () => {
+  const originalUserId = env.NOTE_USER_ID;
+  let called = false;
+  try {
+    env.NOTE_USER_ID = "owner";
+    const invalidHandler = registerHandlers(async () => ({
+      data: {
+        dashboardNoteListConnection: {
+          pageInfo: { hasNextPage: false, endCursor: null },
+          edges: [{ node: { note: { link: { absoluteUrl: "https://note.com/owner/n/key" } }, metrics: { pageViewCount: 5 } } }],
+        },
+      },
+    })).get("get-note-page-views");
+    const invalid = await invalidHandler({ period: "ALL" });
+    assert.equal(invalid.isError, true);
+    assert.doesNotMatch(invalid.content[0].text, /response body|session|cookie/i);
+    env.NOTE_USER_ID = "";
+    const missingUserHandler = registerHandlers(async () => { called = true; return {}; }).get("get-note-page-views");
+    const missingUser = await missingUserHandler({ period: "ALL" });
+    assert.equal(missingUser.isError, true);
+    assert.equal(called, false);
+  } finally {
+    env.NOTE_USER_ID = originalUserId;
+  }
+});
+
+test("project instructions match the seven-tool read/write contract", () => {
+  assert.match(agentInstructions, /seven tools/i);
+  assert.match(agentInstructions, /Analytics reads are limited to the configured user's page-view data/i);
   assert.match(agentInstructions, /draft-save path/i);
   assert.match(agentInstructions, /draft metadata path/i);
   assert.match(
     agentInstructions,
-    /configured-user identity before authenticated list, read, create-draft, or edit-draft operations/i
+    /configured-user identity before authenticated list, read, page-view, create-draft, or edit-draft operations/i
   );
   assert.match(
     agentInstructions,
@@ -204,6 +358,31 @@ test("API requests replace case-insensitive multipart headers and retain JSON de
   assert.equal(header(requests[1].headers, "origin"), "https://note.com");
   assert.equal(header(requests[1].headers, "referer"), "https://note.com/");
   assert.equal(header(requests[1].headers, "content-type"), "application/json");
+});
+test("dashboard GraphQL requests use the verified private endpoint", async () => {
+  let url;
+  let options;
+  const response = await noteApiRequest(
+    DASHBOARD_GRAPHQL_ENDPOINT,
+    "POST",
+    { operationName: "Dashboard_StatPageQuery", variables: { unit: "LAST_28_DAYS" }, query: "query {}" },
+    false,
+    undefined,
+    async (requestedUrl, requestOptions) => {
+      url = requestedUrl;
+      options = requestOptions;
+      return { ok: true, status: 200, json: async () => ({ data: {} }) };
+    }
+  );
+  assert.equal(url, "https://graphql.note.com/graphql");
+  assert.equal(options.method, "POST");
+  assert.equal(options.headers["Content-Type"], "application/json");
+  assert.deepEqual(JSON.parse(options.body), {
+    operationName: "Dashboard_StatPageQuery",
+    variables: { unit: "LAST_28_DAYS" },
+    query: "query {}",
+  });
+  assert.deepEqual(response, { data: {} });
 });
 
 test("Eyecatch handler keeps ownership, draft, and XSRF guards before upload", async () => {
@@ -353,6 +532,13 @@ test("documentation states authentication and ownership boundaries", () => {
   assert.match(readmeJa, /セッション応答のXSRFトークン/);
   assert.match(readme, /NOTE_ALL_COOKIES.*live draft smoke.*NOTE_XSRF_TOKEN/i);
   assert.match(spec, /draft and eyecatch writes include an XSRF token.*when available/i);
+});
+test("page-view tool and documentation distinguish PV from other metrics", () => {
+  assert.match(readme, /`get-note-page-views`.*page views \(PV\).*private dashboard GraphQL API/i);
+  assert.match(readmeJa, /`get-note-page-views`.*非公開ダッシュボードGraphQL API.*ページビュー（PV）/);
+  assert.match(spec, /`get-note-page-views`.*`dashboardNoteListConnection`.*https:\/\/graphql\.note\.com\/graphql/);
+  assert.match(spec, /page views \(PV\), not impressions or Amazon clicks/i);
+  assert.match(spec, /private dashboard GraphQL API.*may require maintenance/i);
 });
 
 test("Live smoke tests require both explicit opt-in flags", () => {

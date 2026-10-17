@@ -4,7 +4,7 @@
 
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/yuru-sha/note-ops)
 
-A local stdio MCP server for managing note.com articles and drafts. It currently provides only an MVP focused on drafts.
+A local stdio MCP server for managing note.com articles and drafts. It supports draft operations and a read-only page-view lookup.
 
 ## Quick Start
 
@@ -17,9 +17,9 @@ npm run build
 npm start
 ```
 
-To list or read articles, create drafts, or edit drafts, configure `NOTE_USER_ID` and one of the following authentication methods: an existing session (`NOTE_SESSION_V5`; draft operations use `NOTE_XSRF_TOKEN` or the XSRF token from the session response), `NOTE_ALL_COOKIES`, or direct login with `NOTE_EMAIL` and `NOTE_PASSWORD`. Never commit credentials or include them in logs or MCP responses.
+To list or read articles, retrieve page views, create drafts, or edit drafts, configure `NOTE_USER_ID` and one of the following authentication methods: an existing session (`NOTE_SESSION_V5`; draft operations use `NOTE_XSRF_TOKEN` or the XSRF token from the session response), `NOTE_ALL_COOKIES`, or direct login with `NOTE_EMAIL` and `NOTE_PASSWORD`. Never commit credentials or include them in logs or MCP responses.
 
-For authenticated operations, verify in advance that note.com's `current_user` matches `NOTE_USER_ID`. For `get-note`, `edit-note`, and `set-note-eyecatch`, also verify note ownership. When `get-note` receives a numeric ID, it resolves the note key from the authenticated user's note list before fetching details. For a numeric ID, `open-note-editor` also resolves the note key from the authenticated user's note list and returns `https://editor.note.com/notes/<note-key>/edit/`. If identities do not match, ownership cannot be verified, the note key cannot be resolved, or authentication fails, the operation fails closed and returns an error without secret information. When given a note key directly, `open-note-editor` does not fetch the note list.
+For authenticated operations, verify in advance that note.com's `current_user` matches `NOTE_USER_ID`. The page-view dashboard query is also made through this verified user session. For `get-note`, `edit-note`, and `set-note-eyecatch`, also verify note ownership. When `get-note` receives a numeric ID, it resolves the note key from the authenticated user's note list before fetching details. For a numeric ID, `open-note-editor` also resolves the note key from the authenticated user's note list and returns `https://editor.note.com/notes/<note-key>/edit/`. If identities do not match, ownership cannot be verified, the note key cannot be resolved, or authentication fails, the operation fails closed and returns an error without secret information. When given a note key directly, `open-note-editor` does not fetch the note list.
 
 ## MCP Tools
 
@@ -27,13 +27,13 @@ For authenticated operations, verify in advance that note.com's `current_user` m
 |---|---|---|
 | `get-my-notes` | List my articles and drafts | Read only |
 | `get-note` | Read article or draft details | Read only |
+| `get-note-page-views` | Read article page views (PV) for a selected period | Read only |
 | `post-draft-note` | Create or update a draft | Save as draft |
 | `edit-note` | Save an existing article as a draft | Save as draft |
 | `set-note-eyecatch` | Set a local image as the title image for my draft | Update draft metadata |
 | `open-note-editor` | Generate an editor URL | Read only |
 
-Publishing, commenting, liking, uploading body images, searching, Notion, Obsidian, HTTP/n8n, and browser automation are outside the MVP. Publish from note.com. A title image can only be set on your authenticated draft, using a local PNG/JPEG/GIF/WebP file with actual dimensions of 1280x670 pixels and a size of 10 MB or less. Published articles are not supported. `post-draft-note` returns the actual note key from note.com's create response or the authenticated draft list.
-
+Publishing, commenting, liking, uploading body images, search, non-page-view analytics, Notion, Obsidian, HTTP/n8n, and browser automation are outside the MVP. `get-note-page-views` reads page views (PV) from note.com's private dashboard GraphQL API, distinct from impressions and Amazon clicks; the endpoint may change independently and require maintenance. Supported periods: `LAST_7_DAYS`, `LAST_28_DAYS`, `LAST_365_DAYS`, `THIS_MONTH`, `LAST_MONTH`, and `ALL`, plus `CUSTOM` with `startDate` and `endDate` from 2014-04-01 through today. The tool returns each article's `noteKey`, `url`, and `pageViews`, plus the represented period. Publish from note.com. A title image can only be set on your authenticated draft, using a local PNG/JPEG/GIF/WebP file with actual dimensions of 1280x670 pixels and a size of 10 MB or less. Published articles are not supported. `post-draft-note` returns the actual note key from note.com's create response or the authenticated draft list.
 ## MCP Client Configuration Example
 
 ```json
