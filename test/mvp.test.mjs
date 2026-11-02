@@ -957,3 +957,23 @@ test("Draft fields and note-list queries match note.com response shapes", () => 
   assert.equal(buildNoteListQuery(2, 20, "all"), "limit=20&page=2");
   assert.equal(buildNoteListQuery(2, 20, "draft"), "limit=20&page=2&status=draft");
 });
+
+test("Environment loading does not write dotenv status messages", async () => {
+  const { spawnSync } = await import("node:child_process");
+  const script = `
+    let stderr = "";
+    process.stderr.write = (chunk) => {
+      stderr += chunk;
+      return true;
+    };
+    await import("./build/config/environment.js");
+    process.stdout.write(JSON.stringify(stderr));
+  `;
+  const result = spawnSync(process.execPath, ["--input-type=module", "-e", script], {
+    cwd: repositoryRoot,
+    encoding: "utf8",
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, '""');
+});

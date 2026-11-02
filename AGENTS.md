@@ -78,7 +78,7 @@ npm run test:live       # opt-in note.com smoke workflow
 ## Runtime/Tooling Preferences
 
 - Use Node.js 20 (the CI runtime) and npm; `package.json` is ESM (`"type": "module"`).
-- TypeScript 5 compiles the server to `build/`; Node runs the compiled entry point. The tests are `.mjs` files using compiled output.
+- TypeScript 7 compiles the server to `build/`; Node runs the compiled entry point. The tests are `.mjs` files using compiled output.
 - Prefer existing dependencies and Node.js facilities. Do not add dependencies or change the runtime/toolchain without a concrete need.
 
 ## Testing & QA
